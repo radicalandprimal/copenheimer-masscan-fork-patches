@@ -1,0 +1,5256 @@
+diff --git a/src/main.c b/src/main.c
+index 3a9e789..8baffba 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -17,47 +17,47 @@
+ */
+ #include "masscan.h"
+ #include "masscan-version.h"
+-#include "masscan-status.h"     /* open or closed */
+-#include "rand-blackrock.h"     /* the BlackRock shuffling func */
+-#include "rand-lcg.h"           /* the LCG randomization func */
+-#include "templ-pkt.h"          /* packet template, that we use to send */
+-#include "rawsock.h"            /* API on top of Linux, Windows, Mac OS X*/
+-#include "logger.h"             /* adjust with -v command-line opt */
+-#include "main-status.h"        /* printf() regular status updates */
+-#include "main-throttle.h"      /* rate limit */
+-#include "main-dedup.h"         /* ignore duplicate responses */
+-#include "main-ptrace.h"        /* for nmap --packet-trace feature */
+-#include "proto-arp.h"          /* for responding to ARP requests */
+-#include "stack-ndpv6.h"        /* IPv6 Neighbor Discovery Protocol */
+-#include "stack-arpv4.h"        /* Handle ARP resolution and requests */
++#include "masscan-status.h" /* open or closed */
++#include "rand-blackrock.h" /* the BlackRock shuffling func */
++#include "rand-lcg.h"       /* the LCG randomization func */
++#include "templ-pkt.h"      /* packet template, that we use to send */
++#include "rawsock.h"        /* API on top of Linux, Windows, Mac OS X*/
++#include "logger.h"         /* adjust with -v command-line opt */
++#include "main-status.h"    /* printf() regular status updates */
++#include "main-throttle.h"  /* rate limit */
++#include "main-dedup.h"     /* ignore duplicate responses */
++#include "main-ptrace.h"    /* for nmap --packet-trace feature */
++#include "proto-arp.h"      /* for responding to ARP requests */
++#include "stack-ndpv6.h"    /* IPv6 Neighbor Discovery Protocol */
++#include "stack-arpv4.h"    /* Handle ARP resolution and requests */
+ #include "rawsock-adapter.h"
+-#include "proto-banner1.h"      /* for snatching banners from systems */
+-#include "proto-tcp.h"          /* for TCP/IP connection table */
+-#include "proto-preprocess.h"   /* quick parse of packets */
+-#include "proto-icmp.h"         /* handle ICMP responses */
+-#include "proto-udp.h"          /* handle UDP responses */
+-#include "syn-cookie.h"         /* for SYN-cookies on send */
+-#include "output.h"             /* for outputting results */
+-#include "rte-ring.h"           /* producer/consumer ring buffer */
+-#include "rawsock-pcapfile.h"   /* for saving pcap files w/ raw packets */
+-#include "stub-pcap.h"          /* dynamically load libpcap library */
+-#include "smack.h"              /* Aho-corasick state-machine pattern-matcher */
+-#include "pixie-timer.h"        /* portable time functions */
+-#include "pixie-threads.h"      /* portable threads */
+-#include "templ-payloads.h"     /* UDP packet payloads */
+-#include "proto-snmp.h"         /* parse SNMP responses */
+-#include "proto-ntp.h"          /* parse NTP responses */
+-#include "proto-coap.h"         /* CoAP selftest */
+-#include "in-binary.h"          /* convert binary output to XML/JSON */
+-#include "main-globals.h"       /* all the global variables in the program */
++#include "proto-banner1.h"    /* for snatching banners from systems */
++#include "proto-tcp.h"        /* for TCP/IP connection table */
++#include "proto-preprocess.h" /* quick parse of packets */
++#include "proto-icmp.h"       /* handle ICMP responses */
++#include "proto-udp.h"        /* handle UDP responses */
++#include "syn-cookie.h"       /* for SYN-cookies on send */
++#include "output.h"           /* for outputting results */
++#include "rte-ring.h"         /* producer/consumer ring buffer */
++#include "rawsock-pcapfile.h" /* for saving pcap files w/ raw packets */
++#include "stub-pcap.h"        /* dynamically load libpcap library */
++#include "smack.h"            /* Aho-corasick state-machine pattern-matcher */
++#include "pixie-timer.h"      /* portable time functions */
++#include "pixie-threads.h"    /* portable threads */
++#include "templ-payloads.h"   /* UDP packet payloads */
++#include "proto-snmp.h"       /* parse SNMP responses */
++#include "proto-ntp.h"        /* parse NTP responses */
++#include "proto-coap.h"       /* CoAP selftest */
++#include "in-binary.h"        /* convert binary output to XML/JSON */
++#include "main-globals.h"     /* all the global variables in the program */
+ #include "proto-zeroaccess.h"
+ #include "siphash24.h"
+ #include "proto-x509.h"
+-#include "crypto-base64.h"      /* base64 encode/decode */
++#include "crypto-base64.h" /* base64 encode/decode */
+ #include "pixie-backtrace.h"
+ #include "proto-sctp.h"
+-#include "proto-oproto.h"       /* Other protocols on top of IP */
+-#include "vulncheck.h"          /* checking vulns like monlist, poodle, heartblee */
++#include "proto-oproto.h" /* Other protocols on top of IP */
++#include "vulncheck.h"    /* checking vulns like monlist, poodle, heartblee */
+ #include "main-readrange.h"
+ #include "scripting.h"
+ #include "read-service-probes.h"
+@@ -95,12 +95,12 @@ time_t global_now;
+ 
+ uint64_t usec_start;
+ 
+-
+ /***************************************************************************
+  * We create a pair of transmit/receive threads for each network adapter.
+  * This structure contains the parameters we send to each pair.
+  ***************************************************************************/
+-struct ThreadPair {
++struct ThreadPair
++{
+     /** This points to the central configuration. Note that it's 'const',
+      * meaning that the thread cannot change the contents. That'd be
+      * unsafe */
+@@ -129,7 +129,6 @@ struct ThreadPair {
+      */
+     volatile uint64_t my_index;
+ 
+-
+     /* This is used both by the transmit and receive thread for
+      * formatting packets */
+     struct TemplateSet tmplset[1];
+@@ -158,21 +157,19 @@ struct ThreadPair {
+     size_t thread_handle_recv;
+ };
+ 
+-
+-
+ /***************************************************************************
+  * We support a range of source IP/port. This function converts that
+  * range into useful variables we can use to pick things form that range.
+  ***************************************************************************/
+ static void
+ adapter_get_source_addresses(const struct Masscan *masscan,
+-            unsigned nic_index,
+-            unsigned *src_ipv4,
+-            unsigned *src_ipv4_mask,
+-            unsigned *src_port,
+-            unsigned *src_port_mask,
+-            ipv6address *src_ipv6,
+-            ipv6address *src_ipv6_mask)
++                             unsigned nic_index,
++                             unsigned *src_ipv4,
++                             unsigned *src_ipv4_mask,
++                             unsigned *src_port,
++                             unsigned *src_port_mask,
++                             ipv6address *src_ipv6,
++                             ipv6address *src_ipv6_mask)
+ {
+     const struct stack_src_t *src = &masscan->nic[nic_index].src;
+     static ipv6address mask = {~0ULL, ~0ULL};
+@@ -217,7 +214,7 @@ transmit_thread(void *v) /*aka. scanning_thread() */
+     struct TemplateSet pkt_template = templ_copy(parms->tmplset);
+     struct Adapter *adapter = parms->adapter;
+     uint64_t packets_sent = 0;
+-    unsigned increment = (masscan->shard.of-1) + masscan->nic_count;
++    unsigned increment = (masscan->shard.of - 1) + masscan->nic_count;
+     unsigned src_ipv4;
+     unsigned src_ipv4_mask;
+     unsigned src_port;
+@@ -238,28 +235,25 @@ transmit_thread(void *v) /*aka. scanning_thread() */
+     *status_syn_count = 0;
+     parms->total_syns = status_syn_count;
+ 
+-
+     /* Normally, we have just one source address. In special cases, though
+      * we can have multiple. */
+     adapter_get_source_addresses(masscan, parms->nic_index,
+-                &src_ipv4, &src_ipv4_mask,
+-                &src_port, &src_port_mask,
+-                &src_ipv6, &src_ipv6_mask);
+-
++                                 &src_ipv4, &src_ipv4_mask,
++                                 &src_port, &src_port_mask,
++                                 &src_ipv6, &src_ipv6_mask);
+ 
+     /* "THROTTLER" rate-limits how fast we transmit, set with the
+      * --max-rate parameter */
+-    throttler_start(throttler, masscan->max_rate/masscan->nic_count);
++    throttler_start(throttler, masscan->max_rate / masscan->nic_count);
+ 
+ infinite:
+-    
++
+     /* Create the shuffler/randomizer. This creates the 'range' variable,
+      * which is simply the number of IP addresses times the number of
+      * ports.
+      * IPv6: low index will pick addresses from the IPv6 ranges, and high
+      * indexes will pick addresses from the IPv4 ranges. */
+-    range = count_ipv4 * rangelist_count(&masscan->targets.ports)
+-            + count_ipv6 * rangelist_count(&masscan->targets.ports);
++    range = count_ipv4 * rangelist_count(&masscan->targets.ports) + count_ipv6 * rangelist_count(&masscan->targets.ports);
+     range_ipv6 = count_ipv6 * rangelist_count(&masscan->targets.ports);
+     blackrock_init(&blackrock, range, seed, masscan->blackrock_rounds);
+ 
+@@ -269,18 +263,18 @@ infinite:
+      * a little bit past the end when we have --retries. Yet another
+      * thing to do here is deal with multiple network adapters, which
+      * is essentially the same logic as shards. */
+-    start = masscan->resume.index + (masscan->shard.one-1) + parms->nic_index;
++    start = masscan->resume.index + (masscan->shard.one - 1) + parms->nic_index;
+     end = range;
+     if (masscan->resume.count && end > start + masscan->resume.count)
+         end = start + masscan->resume.count;
+     end += retries * range;
+ 
+-
+     /* -----------------
+      * the main loop
+      * -----------------*/
+     LOG(3, "THREAD: xmit: starting main loop: [%llu..%llu]\n", start, end);
+-    for (i=start; i<end; ) {
++    for (i = start; i < end;)
++    {
+         uint64_t batch_size;
+ 
+         /*
+@@ -299,8 +293,7 @@ infinite:
+          * able to transmit SYN packets.
+          */
+         stack_flush_packets(parms->stack, adapter,
+-                        &packets_sent, &batch_size);
+-
++                            &packets_sent, &batch_size);
+ 
+         /*
+          * Transmit a bunch of packets. At any rate slower than 100,000
+@@ -312,11 +305,10 @@ infinite:
+          * very precise packet-timing for low rates below 100,000 pps,
+          * while not incurring the overhead for high packet rates.
+          */
+-        while (batch_size && i < end) {
++        while (batch_size && i < end)
++        {
+             uint64_t xXx;
+             uint64_t cookie;
+-            
+-
+ 
+             /*
+              * RANDOMIZE THE TARGET:
+@@ -334,9 +326,10 @@ infinite:
+             else
+                 while (xXx >= range)
+                     xXx -= range;
+-            xXx = blackrock_shuffle(&blackrock,  xXx);
+-            
+-            if (xXx < range_ipv6) {
++            xXx = blackrock_shuffle(&blackrock, xXx);
++
++            if (xXx < range_ipv6)
++            {
+                 ipv6address ip_them;
+                 unsigned port_them;
+                 ipv6address ip_me;
+@@ -347,20 +340,21 @@ infinite:
+ 
+                 ip_me = src_ipv6;
+                 port_me = src_port;
+-                
++
+                 cookie = syn_cookie_ipv6(ip_them, port_them, ip_me, port_me, entropy);
+ 
+                 rawsock_send_probe_ipv6(
+-                        adapter,
+-                        ip_them, port_them,
+-                        ip_me, port_me,
+-                        (unsigned)cookie,
+-                        !batch_size, /* flush queue on last packet in batch */
+-                        &pkt_template
+-                        );
++                    adapter,
++                    ip_them, port_them,
++                    ip_me, port_me,
++                    (unsigned)cookie,
++                    !batch_size, /* flush queue on last packet in batch */
++                    &pkt_template);
+ 
+                 /* Our index selects an IPv6 target */
+-            } else {
++            }
++            else
++            {
+                 /* Our index selects an IPv4 target. In other words, low numbers
+                  * index into the IPv6 ranges, and high numbers index into the
+                  * IPv4 ranges. */
+@@ -378,14 +372,17 @@ infinite:
+                  * SYN-COOKIE LOGIC
+                  *  Figure out the source IP/port, and the SYN cookie
+                  */
+-                if (src_ipv4_mask > 1 || src_port_mask > 1) {
+-                    uint64_t ck = syn_cookie_ipv4((unsigned)(i+repeats),
+-                                            (unsigned)((i+repeats)>>32),
+-                                            (unsigned)xXx, (unsigned)(xXx>>32),
+-                                            entropy);
++                if (src_ipv4_mask > 1 || src_port_mask > 1)
++                {
++                    uint64_t ck = syn_cookie_ipv4((unsigned)(i + repeats),
++                                                  (unsigned)((i + repeats) >> 32),
++                                                  (unsigned)xXx, (unsigned)(xXx >> 32),
++                                                  entropy);
+                     port_me = src_port + (ck & src_port_mask);
+-                    ip_me = src_ipv4 + ((ck>>16) & src_ipv4_mask);
+-                } else {
++                    ip_me = src_ipv4 + ((ck >> 16) & src_ipv4_mask);
++                }
++                else
++                {
+                     ip_me = src_ipv4;
+                     port_me = src_port;
+                 }
+@@ -399,13 +396,12 @@ infinite:
+                  *  we can call this function millions of times a second.
+                  */
+                 rawsock_send_probe_ipv4(
+-                        adapter,
+-                        ip_them, port_them,
+-                        ip_me, port_me,
+-                        (unsigned)cookie,
+-                        !batch_size, /* flush queue on last packet in batch */
+-                        &pkt_template
+-                        );
++                    adapter,
++                    ip_them, port_them,
++                    ip_me, port_me,
++                    (unsigned)cookie,
++                    !batch_size, /* flush queue on last packet in batch */
++                    &pkt_template);
+             }
+ 
+             batch_size--;
+@@ -421,14 +417,14 @@ infinite:
+              *  number, we can do lots of creative stuff, like doing clever
+              *  retransmits and sharding.
+              */
+-            if (r == 0) {
++            if (r == 0)
++            {
+                 i += increment; /* <------ increment by 1 normally, more with shards/nics */
+                 r = (unsigned)retries + 1;
+             }
+ 
+         } /* end of batch */
+ 
+-
+         /* save our current location for resuming, if the user pressed
+          * <ctrl-c> to exit early */
+         parms->my_index = i;
+@@ -436,7 +432,8 @@ infinite:
+         /* If the user pressed <ctrl-c>, then we need to exit. In case
+          * the user wants to --resume the scan later, we save the current
+          * state in a file */
+-        if (is_tx_done) {
++        if (is_tx_done)
++        {
+             break;
+         }
+     }
+@@ -445,7 +442,8 @@ infinite:
+      * --infinite
+      *  For load testing, go around and do this again
+      */
+-    if (masscan->is_infinite && !is_tx_done) {
++    if (masscan->is_infinite && !is_tx_done)
++    {
+         seed++;
+         repeats++;
+         goto infinite;
+@@ -470,23 +468,24 @@ infinite:
+      * packets to arrive. Pressing <ctrl-c> a second time will exit this
+      * prematurely.
+      */
+-    while (!is_rx_done) {
++    while (!is_rx_done)
++    {
+         unsigned k;
+         uint64_t batch_size;
+ 
+-        for (k=0; k<1000; k++) {
+-            
++        for (k = 0; k < 1000; k++)
++        {
++
+             /*
+              * Only send a few packets at a time, throttled according to the max
+              * --max-rate set by the user
+              */
+             batch_size = throttler_next_batch(throttler, packets_sent);
+ 
+-
+             /* Transmit packets from the receive thread */
+-            stack_flush_packets(  parms->stack, adapter,
+-                            &packets_sent,
+-                            &batch_size);
++            stack_flush_packets(parms->stack, adapter,
++                                &packets_sent,
++                                &batch_size);
+ 
+             /* Make sure they've actually been transmitted, not just queued up for
+              * transmit */
+@@ -501,14 +500,13 @@ infinite:
+     LOG(1, "[+] exiting transmit thread #%u                    \n", parms->nic_index);
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+ static unsigned
+ is_nic_port(const struct Masscan *masscan, unsigned ip)
+ {
+     unsigned i;
+-    for (i=0; i<masscan->nic_count; i++)
++    for (i = 0; i < masscan->nic_count; i++)
+         if (is_my_port(&masscan->nic[i].src, ip))
+             return 1;
+     return 0;
+@@ -519,10 +517,9 @@ is_ipv6_multicast(ipaddress ip_me)
+ {
+     /* If this is an IPv6 multicast packet, one sent to the IPv6
+      * address with a prefix of FF02::/16 */
+-    return ip_me.version == 6 && (ip_me.ipv6.hi>>48ULL) == 0xFF02;
++    return ip_me.version == 6 && (ip_me.ipv6.hi >> 48ULL) == 0xFF02;
+ }
+ 
+-
+ /***************************************************************************
+  *
+  * Asynchronous receive thread
+@@ -549,8 +546,6 @@ receive_thread(void *v)
+     struct ResetFilter *rf;
+     struct stack_t *stack = parms->stack;
+ 
+-    
+-    
+     /* For reducing RST responses, see rstfilter_is_filter() below */
+     rf = rstfilter_create(entropy, 16384);
+ 
+@@ -564,13 +559,15 @@ receive_thread(void *v)
+     parms->total_tcbs = status_tcb_count;
+ 
+     LOG(1, "[+] starting receive thread #%u\n", parms->nic_index);
+-    
++
+     /* Lock this thread to a CPU. Transmit threads are on even CPUs,
+      * receive threads on odd CPUs */
+-    if (pixie_cpu_get_count() > 1) {
++    if (pixie_cpu_get_count() > 1)
++    {
+         unsigned cpu_count = pixie_cpu_get_count();
+         unsigned cpu = parms->nic_index * 2 + 1;
+-        while (cpu >= cpu_count) {
++        while (cpu >= cpu_count)
++        {
+             cpu -= cpu_count;
+             cpu++;
+         }
+@@ -584,7 +581,8 @@ receive_thread(void *v)
+      * strange things people send us. Note that we don't record transmitted
+      * packets, just the packets we've received.
+      */
+-    if (masscan->pcap_filename[0]) {
++    if (masscan->pcap_filename[0])
++    {
+         pcapfile = pcapfile_openwrite(masscan->pcap_filename, 1);
+     }
+ 
+@@ -604,7 +602,8 @@ receive_thread(void *v)
+      * Create a TCP connection table (per thread pair) for interacting with live
+      * connections when doing --banners
+      */
+-    if (masscan->is_banners) {
++    if (masscan->is_banners)
++    {
+         struct TcpCfgPayloads *pay;
+         size_t i;
+ 
+@@ -612,30 +611,28 @@ receive_thread(void *v)
+          * Create TCP connection table
+          */
+         tcpcon = tcpcon_create_table(
+-            (size_t)((masscan->max_rate/5) / masscan->nic_count),
++            (size_t)((masscan->max_rate / 5) / masscan->nic_count),
+             parms->stack,
+             &parms->tmplset->pkts[Proto_TCP],
+             output_report_banner,
+             out,
+             masscan->tcb.timeout,
+-            masscan->seed
+-            );
+-        
++            masscan->seed);
++
+         /*
+          * Initialize TCP scripting
+          */
+         scripting_init_tcp(tcpcon, masscan->scripting.L);
+-        
+-        
++
+         /*
+          * Set some flags [kludge]
+          */
+         tcpcon_set_banner_flags(tcpcon,
+-                masscan->is_capture_cert,
+-                masscan->is_capture_servername,
+-                masscan->is_capture_html,
+-                masscan->is_capture_heartbleed,
+-				masscan->is_capture_ticketbleed);
++                                masscan->is_capture_cert,
++                                masscan->is_capture_servername,
++                                masscan->is_capture_html,
++                                masscan->is_capture_heartbleed,
++                                masscan->is_capture_ticketbleed);
+         if (masscan->is_hello_smbv1)
+             tcpcon_set_parameter(tcpcon, "hello", 1, "smbv1");
+         if (masscan->is_hello_http)
+@@ -650,92 +647,97 @@ receive_thread(void *v)
+             tcpcon_set_parameter(tcpcon, "sslv3", 1, "1");
+ 
+         if (masscan->http.payload)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-payload",
+-                                    masscan->http.payload_length,
+-                                    masscan->http.payload);
++            tcpcon_set_parameter(tcpcon,
++                                 "http-payload",
++                                 masscan->http.payload_length,
++                                 masscan->http.payload);
+         if (masscan->http.user_agent)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-user-agent",
+-                                    masscan->http.user_agent_length,
+-                                    masscan->http.user_agent);
++            tcpcon_set_parameter(tcpcon,
++                                 "http-user-agent",
++                                 masscan->http.user_agent_length,
++                                 masscan->http.user_agent);
+         if (masscan->http.host)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-host",
+-                                    masscan->http.host_length,
+-                                    masscan->http.host);
++            tcpcon_set_parameter(tcpcon,
++                                 "http-host",
++                                 masscan->http.host_length,
++                                 masscan->http.host);
+         if (masscan->http.method)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-method",
+-                                    masscan->http.method_length,
+-                                    masscan->http.method);
++            tcpcon_set_parameter(tcpcon,
++                                 "http-method",
++                                 masscan->http.method_length,
++                                 masscan->http.method);
+         if (masscan->http.url)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-url",
+-                                    masscan->http.url_length,
+-                                    masscan->http.url);
++            tcpcon_set_parameter(tcpcon,
++                                 "http-url",
++                                 masscan->http.url_length,
++                                 masscan->http.url);
+         if (masscan->http.version)
+-            tcpcon_set_parameter(   tcpcon,
+-                                    "http-version",
+-                                    masscan->http.version_length,
+-                                    masscan->http.version);
+-
++            tcpcon_set_parameter(tcpcon,
++                                 "http-version",
++                                 masscan->http.version_length,
++                                 masscan->http.version);
+ 
+-        if (masscan->tcp_connection_timeout) {
++        if (masscan->tcp_connection_timeout)
++        {
+             char foo[64];
+             sprintf_s(foo, sizeof(foo), "%u", masscan->tcp_connection_timeout);
+-            tcpcon_set_parameter(   tcpcon,
++            tcpcon_set_parameter(tcpcon,
+                                  "timeout",
+                                  strlen(foo),
+                                  foo);
+         }
+-        if (masscan->tcp_hello_timeout) {
++        if (masscan->tcp_hello_timeout)
++        {
+             char foo[64];
+             sprintf_s(foo, sizeof(foo), "%u", masscan->tcp_hello_timeout);
+-            tcpcon_set_parameter(   tcpcon,
++            tcpcon_set_parameter(tcpcon,
+                                  "hello-timeout",
+                                  strlen(foo),
+                                  foo);
+         }
+-        
+-        for (i=0; i<masscan->http.headers_count; i++) {
++
++        for (i = 0; i < masscan->http.headers_count; i++)
++        {
+             tcpcon_set_http_header(tcpcon,
+-                        masscan->http.headers[i].name,
+-                        masscan->http.headers[i].value_length,
+-                        masscan->http.headers[i].value,
+-                        http_field_replace);
++                                   masscan->http.headers[i].name,
++                                   masscan->http.headers[i].value_length,
++                                   masscan->http.headers[i].value,
++                                   http_field_replace);
+         }
+-        for (i=0; i<masscan->http.cookies_count; i++) {
++        for (i = 0; i < masscan->http.cookies_count; i++)
++        {
+             tcpcon_set_http_header(tcpcon,
+-                        "Cookie",
+-                        masscan->http.cookies[i].value_length,
+-                        masscan->http.cookies[i].value,
+-                        http_field_add);
++                                   "Cookie",
++                                   masscan->http.cookies[i].value_length,
++                                   masscan->http.cookies[i].value,
++                                   http_field_add);
+         }
+-        for (i=0; i<masscan->http.remove_count; i++) {
++        for (i = 0; i < masscan->http.remove_count; i++)
++        {
+             tcpcon_set_http_header(tcpcon,
+-                        masscan->http.headers[i].name,
+-                        0,
+-                        0,
+-                        http_field_remove);
++                                   masscan->http.headers[i].name,
++                                   0,
++                                   0,
++                                   http_field_remove);
+         }
+ 
+-        for (pay = masscan->payloads.tcp; pay; pay = pay->next) {
++        for (pay = masscan->payloads.tcp; pay; pay = pay->next)
++        {
+             char name[64];
+             sprintf_s(name, sizeof(name), "hello-string[%u]", pay->port);
+-            tcpcon_set_parameter(   tcpcon, 
+-                                    name, 
+-                                    strlen(pay->payload_base64), 
+-                                    pay->payload_base64);
++            tcpcon_set_parameter(tcpcon,
++                                 name,
++                                 strlen(pay->payload_base64),
++                                 pay->payload_base64);
+         }
+-
+     }
+ 
+     /*
+      * In "offline" mode, we don't have any receive threads, so simply
+      * wait until transmitter thread is done then go to the end
+      */
+-    if (masscan->is_offline) {
++    if (masscan->is_offline)
++    {
+         while (!is_rx_done)
+             pixie_usleep(10000);
+         parms->done_receiving = 1;
+@@ -747,7 +749,8 @@ receive_thread(void *v)
+      * them to the terminal.
+      */
+     LOG(2, "[+] THREAD: recv: starting main loop\n");
+-    while (!is_rx_done) {
++    while (!is_rx_done)
++    {
+         int status;
+         unsigned length;
+         unsigned secs;
+@@ -771,24 +774,25 @@ receive_thread(void *v)
+          * This is the boring part of actually receiving a packet
+          */
+         err = rawsock_recv_packet(
+-                    adapter,
+-                    &length,
+-                    &secs,
+-                    &usecs,
+-                    &px);
+-        if (err != 0) {
++            adapter,
++            &length,
++            &secs,
++            &usecs,
++            &px);
++        if (err != 0)
++        {
+             if (tcpcon)
+                 tcpcon_timeouts(tcpcon, (unsigned)time(0), 0);
+             continue;
+         }
+-        
+ 
+         /*
+          * Do any TCP event timeouts based on the current timestamp from
+          * the packet. For example, if the connection has been open for
+          * around 10 seconds, we'll close the connection. (--banners)
+          */
+-        if (tcpcon) {
++        if (tcpcon)
++        {
+             tcpcon_timeouts(tcpcon, secs, usecs);
+         }
+ 
+@@ -809,24 +813,28 @@ receive_thread(void *v)
+         port_them = parsed.port_src;
+         seqno_them = TCP_SEQNO(px, parsed.transport_offset);
+         seqno_me = TCP_ACKNO(px, parsed.transport_offset);
+-        
++
+         assert(ip_me.version != 0);
+         assert(ip_them.version != 0);
+ 
+-        switch (parsed.ip_protocol) {
++        switch (parsed.ip_protocol)
++        {
+         case 132: /* SCTP */
+-            cookie = syn_cookie(ip_them, port_them | (Proto_SCTP<<16), ip_me, port_me, entropy) & 0xFFFFFFFF;
++            cookie = syn_cookie(ip_them, port_them | (Proto_SCTP << 16), ip_me, port_me, entropy) & 0xFFFFFFFF;
+             break;
+         default:
+             cookie = syn_cookie(ip_them, port_them, ip_me, port_me, entropy) & 0xFFFFFFFF;
+         }
+ 
+         /* verify: my IP address */
+-        if (!is_my_ip(stack->src, ip_me)) {
++        if (!is_my_ip(stack->src, ip_me))
++        {
+             /* NDP Neighbor Solicitations don't come to our IP address, but to
+              * a multicast address */
+-            if (is_ipv6_multicast(ip_me)) {
+-                if (parsed.found == FOUND_NDPv6 && parsed.opcode == 135) {
++            if (is_ipv6_multicast(ip_me))
++            {
++                if (parsed.found == FOUND_NDPv6 && parsed.opcode == 135)
++                {
+                     stack_ndpv6_incoming_request(stack, &parsed, px, length);
+                 }
+             }
+@@ -836,97 +844,99 @@ receive_thread(void *v)
+         /*
+          * Handle non-TCP protocols
+          */
+-        switch (parsed.found) {
+-            case FOUND_NDPv6:
+-                switch (parsed.opcode) {
+-                case 133: /* Router Solicitation */
+-                    /* Ignore router solicitations, since we aren't a router */
+-                    continue;
+-                case 134: /* Router advertisement */
+-                    /* TODO: We need to process router advertisements while scanning
++        switch (parsed.found)
++        {
++        case FOUND_NDPv6:
++            switch (parsed.opcode)
++            {
++            case 133: /* Router Solicitation */
++                /* Ignore router solicitations, since we aren't a router */
++                continue;
++            case 134: /* Router advertisement */
++                /* TODO: We need to process router advertisements while scanning
+                      * so that we can print warning messages if router information
+                      * changes while scanning. */
+-                    continue;
+-                case 135: /* Neighbor Solicitation */
+-                    /* When responses come back from our scans, the router will send us
++                continue;
++            case 135: /* Neighbor Solicitation */
++                /* When responses come back from our scans, the router will send us
+                      * these packets. We need to respond to them, so that the router
+                      * can then forward the packets to us. If we don't respond, we'll
+                      * get no responses. */
+-                    stack_ndpv6_incoming_request(stack, &parsed, px, length);
+-                    continue;
+-                case 136: /* Neighbor Advertisement */
+-                    /* TODO: If doing an --ndpscan, the scanner subsystem needs to deal
++                stack_ndpv6_incoming_request(stack, &parsed, px, length);
++                continue;
++            case 136: /* Neighbor Advertisement */
++                /* TODO: If doing an --ndpscan, the scanner subsystem needs to deal
+                      * with these */
+-                    continue;
+-                case 137: /* Redirect */
+-                    /* We ignore these, since we really don't have the capability to send
++                continue;
++            case 137: /* Redirect */
++                /* We ignore these, since we really don't have the capability to send
+                      * packets to one router for some destinations and to another router
+                      * for other destinations */
+-                    continue;
+-                default:
+-                    break;
+-                }
+                 continue;
+-            case FOUND_ARP:
+-                LOGip(2, ip_them, 0, "-> ARP [%u] \n", px[parsed.found_offset]);
++            default:
++                break;
++            }
++            continue;
++        case FOUND_ARP:
++            LOGip(2, ip_them, 0, "-> ARP [%u] \n", px[parsed.found_offset]);
+ 
+-                switch (parsed.opcode) {
+-                case 1: /* request */
+-                    /* This function will transmit a "reply" to somebody's ARP request
++            switch (parsed.opcode)
++            {
++            case 1: /* request */
++                /* This function will transmit a "reply" to somebody's ARP request
+                      * for our IP address (as part of our user-mode TCP/IP).
+                      * Since we completely bypass the TCP/IP stack, we  have to handle ARPs
+                      * ourself, or the router will lose track of us.*/
+-                     stack_arp_incoming_request(stack,
+-                                      ip_me.ipv4,
+-                                      parms->source_mac,
+-                                      px, length);
+-                    break;
+-                case 2: /* response */
+-                    /* This is for "arp scan" mode, where we are ARPing targets rather
++                stack_arp_incoming_request(stack,
++                                           ip_me.ipv4,
++                                           parms->source_mac,
++                                           px, length);
++                break;
++            case 2: /* response */
++                /* This is for "arp scan" mode, where we are ARPing targets rather
+                      * than port scanning them */
+ 
+-                    /* If we aren't doing an ARP scan, then ignore ARP responses */
+-                    if (!masscan->scan_type.arp)
+-                        break;
+-
+-                    /* If this response isn't in our range, then ignore it */
+-                    if (!rangelist_is_contains(&masscan->targets.ipv4, ip_them.ipv4))
+-                        break;
+-
+-                    /* Ignore duplicates */
+-                    if (dedup_is_duplicate(dedup, ip_them, 0, ip_me, 0))
+-                        continue;
++                /* If we aren't doing an ARP scan, then ignore ARP responses */
++                if (!masscan->scan_type.arp)
++                    break;
+ 
+-                    /* ...everything good, so now report this response */
+-                    arp_recv_response(out, secs, px, length, &parsed);
++                /* If this response isn't in our range, then ignore it */
++                if (!rangelist_is_contains(&masscan->targets.ipv4, ip_them.ipv4))
+                     break;
+-                }
+-                continue;
+-            case FOUND_UDP:
+-            case FOUND_DNS:
+-                if (!is_nic_port(masscan, port_me))
++
++                /* Ignore duplicates */
++                if (dedup_is_duplicate(dedup, ip_them, 0, ip_me, 0))
+                     continue;
+-                if (parms->masscan->nmap.packet_trace)
+-                    packet_trace(stdout, parms->pt_start, px, length, 0);
+-                handle_udp(out, secs, px, length, &parsed, entropy);
+-                continue;
+-            case FOUND_ICMP:
+-                handle_icmp(out, secs, px, length, &parsed, entropy);
+-                continue;
+-            case FOUND_SCTP:
+-                handle_sctp(out, secs, px, length, cookie, &parsed, entropy);
+-                break;
+-            case FOUND_OPROTO: /* other IP proto */
+-                handle_oproto(out, secs, px, length, &parsed, entropy);
+-                break;
+-            case FOUND_TCP:
+-                /* fall down to below */
++
++                /* ...everything good, so now report this response */
++                arp_recv_response(out, secs, px, length, &parsed);
+                 break;
+-            default:
++            }
++            continue;
++        case FOUND_UDP:
++        case FOUND_DNS:
++            if (!is_nic_port(masscan, port_me))
+                 continue;
++            if (parms->masscan->nmap.packet_trace)
++                packet_trace(stdout, parms->pt_start, px, length, 0);
++            handle_udp(out, secs, px, length, &parsed, entropy);
++            continue;
++        case FOUND_ICMP:
++            handle_icmp(out, secs, px, length, &parsed, entropy);
++            continue;
++        case FOUND_SCTP:
++            handle_sctp(out, secs, px, length, cookie, &parsed, entropy);
++            break;
++        case FOUND_OPROTO: /* other IP proto */
++            handle_oproto(out, secs, px, length, &parsed, entropy);
++            break;
++        case FOUND_TCP:
++            /* fall down to below */
++            break;
++        default:
++            continue;
+         }
+ 
+-
+         /* verify: my port number */
+         if (!is_my_port(stack->src, port_me))
+             continue;
+@@ -936,7 +946,8 @@ receive_thread(void *v)
+         Q = 0;
+ 
+         /* Save raw packet in --pcap file */
+-        if (pcapfile) {
++        if (pcapfile)
++        {
+             pcapfile_writeframe(
+                 pcapfile,
+                 px,
+@@ -949,69 +960,78 @@ receive_thread(void *v)
+         {
+             char buf[64];
+             LOGip(5, ip_them, port_them, "-> TCP ackno=0x%08x flags=0x%02x(%s)\n",
+-                seqno_me,
+-                TCP_FLAGS(px, parsed.transport_offset),
+-                reason_string(TCP_FLAGS(px, parsed.transport_offset), buf, sizeof(buf)));
++                  seqno_me,
++                  TCP_FLAGS(px, parsed.transport_offset),
++                  reason_string(TCP_FLAGS(px, parsed.transport_offset), buf, sizeof(buf)));
+         }
+ 
+         /* If recording --banners, create a new "TCP Control Block (TCB)" */
+-        if (tcpcon) {
++        if (tcpcon)
++        {
+             struct TCP_Control_Block *tcb;
+ 
+             /* does a TCB already exist for this connection? */
+             tcb = tcb_lookup(tcpcon,
+-                            ip_me, ip_them,
+-                            port_me, port_them);
++                             ip_me, ip_them,
++                             port_me, port_them);
+ 
+-            if (TCP_IS_SYNACK(px, parsed.transport_offset)) {
+-                if (cookie != seqno_me - 1) {
++            if (TCP_IS_SYNACK(px, parsed.transport_offset))
++            {
++                if (cookie != seqno_me - 1)
++                {
+                     ipaddress_formatted_t fmt = ipaddress_fmt(ip_them);
+                     LOG(2, "%s - bad cookie: ackno=0x%08x expected=0x%08x\n",
+-                        fmt.string, seqno_me-1, cookie);
++                        fmt.string, seqno_me - 1, cookie);
+                     continue;
+                 }
+ 
+-                if (tcb == NULL) {
++                if (tcb == NULL)
++                {
+                     tcb = tcpcon_create_tcb(tcpcon,
+-                                    ip_me, ip_them,
+-                                    port_me, port_them,
+-                                    seqno_me, seqno_them+1,
+-                                    parsed.ip_ttl);
++                                            ip_me, ip_them,
++                                            port_me, port_them,
++                                            seqno_me, seqno_them + 1,
++                                            parsed.ip_ttl);
+                     (*status_tcb_count)++;
+-
+                 }
+ 
+                 Q += stack_incoming_tcp(tcpcon, tcb, TCP_WHAT_SYNACK,
+-                    0, 0, secs, usecs, seqno_them+1);
+-
+-            } else if (tcb) {
++                                        0, 0, secs, usecs, seqno_them + 1);
++            }
++            else if (tcb)
++            {
+                 /* If this is an ACK, then handle that first */
+-                if (TCP_IS_ACK(px, parsed.transport_offset)) {
++                if (TCP_IS_ACK(px, parsed.transport_offset))
++                {
+                     Q += stack_incoming_tcp(tcpcon, tcb, TCP_WHAT_ACK,
+-                        0, seqno_me, secs, usecs, seqno_them);
++                                            0, seqno_me, secs, usecs, seqno_them);
+                 }
+ 
+                 /* If this contains payload, handle that second */
+-                if (parsed.app_length) {
++                if (parsed.app_length)
++                {
+                     Q += stack_incoming_tcp(tcpcon, tcb, TCP_WHAT_DATA,
+-                        px + parsed.app_offset, parsed.app_length,
+-                        secs, usecs, seqno_them);
++                                            px + parsed.app_offset, parsed.app_length,
++                                            secs, usecs, seqno_them);
+                 }
+ 
+                 /* If this is a FIN, handle that. Note that ACK +
+                  * payload + FIN can come together */
+-                if (TCP_IS_FIN(px, parsed.transport_offset)
+-                    && !TCP_IS_RST(px, parsed.transport_offset)) {
++                if (TCP_IS_FIN(px, parsed.transport_offset) && !TCP_IS_RST(px, parsed.transport_offset))
++                {
+                     Q += stack_incoming_tcp(tcpcon, tcb, TCP_WHAT_FIN,
+-                        0, parsed.app_length, secs, usecs, seqno_them);
++                                            0, parsed.app_length, secs, usecs, seqno_them);
+                 }
+ 
+                 /* If this is a RST, then we'll be closing the connection */
+-                if (TCP_IS_RST(px, parsed.transport_offset)) {
++                if (TCP_IS_RST(px, parsed.transport_offset))
++                {
+                     Q += stack_incoming_tcp(tcpcon, tcb, TCP_WHAT_RST,
+-                        0, 0, secs, usecs, seqno_them);
++                                            0, 0, secs, usecs, seqno_them);
+                 }
+-            } else if (TCP_IS_FIN(px, parsed.transport_offset)) {
++            }
++            else if (TCP_IS_FIN(px, parsed.transport_offset))
++            {
+                 ipaddress_formatted_t fmt;
+                 /*
+                  * NO TCB!
+@@ -1022,9 +1042,10 @@ receive_thread(void *v)
+                 LOG(4, "%s: received FIN but no TCB\n", fmt.string);
+                 if (TCP_IS_RST(px, parsed.transport_offset))
+                     ; /* ignore if it's own TCP flag is set */
+-                else {
++                else
++                {
+                     int is_suppress;
+-                    
++
+                     is_suppress = rstfilter_is_filter(rf, ip_me, port_me, ip_them, port_them);
+                     if (!is_suppress)
+                         tcpcon_send_RST(
+@@ -1034,28 +1055,29 @@ receive_thread(void *v)
+                             seqno_them, seqno_me);
+                 }
+             }
+-
+         }
+ 
+         if (Q == 0)
+             ; //printf("\nerr\n");
+-   
+-        if (TCP_IS_SYNACK(px, parsed.transport_offset)
+-            || TCP_IS_RST(px, parsed.transport_offset)) {
++
++        if (TCP_IS_SYNACK(px, parsed.transport_offset) || TCP_IS_RST(px, parsed.transport_offset))
++        {
+ 
+             /* figure out the status */
+             status = PortStatus_Unknown;
+             if (TCP_IS_SYNACK(px, parsed.transport_offset))
+                 status = PortStatus_Open;
+-            if (TCP_IS_RST(px, parsed.transport_offset)) {
++            if (TCP_IS_RST(px, parsed.transport_offset))
++            {
+                 status = PortStatus_Closed;
+             }
+ 
+             /* verify: syn-cookies */
+-            if (cookie != seqno_me - 1) {
++            if (cookie != seqno_me - 1)
++            {
+                 ipaddress_formatted_t fmt = ipaddress_fmt(ip_them);
+                 LOG(5, "%s - bad cookie: ackno=0x%08x expected=0x%08x\n",
+-                    fmt.string, seqno_me-1, cookie);
++                    fmt.string, seqno_me - 1, cookie);
+                 continue;
+             }
+ 
+@@ -1071,17 +1093,15 @@ receive_thread(void *v)
+              * This is where we do the output
+              */
+             output_report_status(
+-                        out,
+-                        global_now,
+-                        status,
+-                        ip_them,
+-                        6, /* ip proto = tcp */
+-                        port_them,
+-                        px[parsed.transport_offset + 13], /* tcp flags */
+-                        parsed.ip_ttl,
+-                        parsed.mac_src
+-                        );
+-            
++                out,
++                global_now,
++                status,
++                ip_them,
++                6, /* ip proto = tcp */
++                port_them,
++                px[parsed.transport_offset + 13], /* tcp flags */
++                parsed.ip_ttl,
++                parsed.mac_src);
+ 
+             /*
+              * Send RST so other side isn't left hanging (only doing this in
+@@ -1094,13 +1114,11 @@ receive_thread(void *v)
+                     ip_them, ip_me,
+                     port_them, port_me,
+                     0, seqno_me);
+-
+         }
+     }
+ 
+-
+     LOG(1, "[+] exiting receive thread #%u                    \n", parms->nic_index);
+-    
++
+     /*
+      * cleanup
+      */
+@@ -1118,7 +1136,6 @@ end:
+     parms->done_receiving = 1;
+ }
+ 
+-
+ /***************************************************************************
+  * We trap the <ctrl-c> so that instead of exiting immediately, we sit in
+  * a loop for a few seconds waiting for any late response. But, the user
+@@ -1128,30 +1145,31 @@ static void control_c_handler(int x)
+ {
+     static unsigned control_c_pressed = 0;
+     static unsigned control_c_pressed_again = 0;
+-    if (control_c_pressed == 0) {
++    if (control_c_pressed == 0)
++    {
+         fprintf(stderr,
+                 "waiting several seconds to exit..."
+-                "                                            \n"
+-                );
++                "                                            \n");
+         fflush(stderr);
+-        control_c_pressed = 1+x;
++        control_c_pressed = 1 + x;
+         is_tx_done = control_c_pressed;
+-    } else {
+-        if (is_rx_done) {
++    }
++    else
++    {
++        if (is_rx_done)
++        {
+             fprintf(stderr, "\nERROR: threads not exiting %d\n", is_rx_done);
+             if (is_rx_done++ > 1)
+                 exit(1);
+-        } else {
++        }
++        else
++        {
+             control_c_pressed_again = 1;
+             is_rx_done = control_c_pressed_again;
+         }
+     }
+-
+ }
+ 
+-
+-
+-
+ /***************************************************************************
+  * Called from main() to initiate the scan.
+  * Launches the 'transmit_thread()' and 'receive_thread()' and waits for
+@@ -1176,36 +1194,40 @@ main_scan(struct Masscan *masscan)
+     /*
+      * Vuln check initialization
+      */
+-    if (masscan->vuln_name) {
++    if (masscan->vuln_name)
++    {
+         unsigned i;
+-		unsigned is_error;
++        unsigned is_error;
+         vulncheck = vulncheck_lookup(masscan->vuln_name);
+-        
++
+         /* If no ports specified on command-line, grab default ports */
+         is_error = 0;
+         if (rangelist_count(&masscan->targets.ports) == 0)
+             rangelist_parse_ports(&masscan->targets.ports, vulncheck->ports, &is_error, 0);
+-        
++
+         /* Kludge: change normal port range to vulncheck range */
+-        for (i=0; i<masscan->targets.ports.count; i++) {
++        for (i = 0; i < masscan->targets.ports.count; i++)
++        {
+             struct Range *r = &masscan->targets.ports.list[i];
+-            r->begin = (r->begin&0xFFFF) | Templ_VulnCheck;
++            r->begin = (r->begin & 0xFFFF) | Templ_VulnCheck;
+             r->end = (r->end & 0xFFFF) | Templ_VulnCheck;
+         }
+     }
+-    
++
+     /*
+      * Initialize the task size
+      */
+     count_ips = rangelist_count(&masscan->targets.ipv4) + range6list_count(&masscan->targets.ipv6).lo;
+-    if (count_ips == 0) {
++    if (count_ips == 0)
++    {
+         LOG(0, "FAIL: target IP address list empty\n");
+         LOG(0, " [hint] try something like \"--range 10.0.0.0/8\"\n");
+         LOG(0, " [hint] try something like \"--range 192.168.0.100-192.168.0.200\"\n");
+         return 1;
+     }
+     count_ports = rangelist_count(&masscan->targets.ports);
+-    if (count_ports == 0) {
++    if (count_ports == 0)
++    {
+         LOG(0, "FAIL: no ports were specified\n");
+         LOG(0, " [hint] try something like \"-p80,8000-9000\"\n");
+         LOG(0, " [hint] try something like \"--ports 0-65535\"\n");
+@@ -1217,8 +1239,10 @@ main_scan(struct Masscan *masscan)
+     /*
+      * If doing an ARP scan, then don't allow port scanning
+      */
+-    if (rangelist_is_contains(&masscan->targets.ports, Templ_ARP)) {
+-        if (masscan->targets.ports.count != 1) {
++    if (rangelist_is_contains(&masscan->targets.ports, Templ_ARP))
++    {
++        if (masscan->targets.ports.count != 1)
++        {
+             LOG(0, "FAIL: cannot arpscan and portscan at the same time\n");
+             return 1;
+         }
+@@ -1228,7 +1252,8 @@ main_scan(struct Masscan *masscan)
+      * If the IP address range is very big, then require that that the
+      * user apply an exclude range
+      */
+-    if (count_ips > 1000000000ULL && rangelist_count(&masscan->exclude.ipv4) == 0) {
++    if (count_ips > 1000000000ULL && rangelist_count(&masscan->exclude.ipv4) == 0)
++    {
+         LOG(0, "FAIL: range too big, need confirmation\n");
+         LOG(0, " [hint] to prevent accidents, at least one --exclude must be specified\n");
+         LOG(0, " [hint] use \"--exclude 255.255.255.255\" as a simple confirmation\n");
+@@ -1242,15 +1267,15 @@ main_scan(struct Masscan *masscan)
+     payloads_udp_trim(masscan->payloads.udp, &masscan->targets);
+     payloads_oproto_trim(masscan->payloads.oproto, &masscan->targets);
+ 
+-
+ #ifdef __AFL_HAVE_MANUAL_CONTROL
+-  __AFL_INIT();
++    __AFL_INIT();
+ #endif
+ 
+     /*
+      * Start scanning threats for each adapter
+      */
+-    for (index=0; index<masscan->nic_count; index++) {
++    for (index = 0; index < masscan->nic_count; index++)
++    {
+         struct ThreadPair *parms = &parms_array[index];
+         int err;
+ 
+@@ -1264,29 +1289,27 @@ main_scan(struct Masscan *masscan)
+          * the scan */
+         parms->pt_start = 1.0 * pixie_gettime() / 1000000.0;
+ 
+-
+         /*
+          * Turn the adapter on, and get the running configuration
+          */
+         err = masscan_initialize_adapter(
+-                            masscan,
+-                            index,
+-                            &parms->source_mac,
+-                            &parms->router_mac_ipv4,
+-                            &parms->router_mac_ipv6
+-                            );
++            masscan,
++            index,
++            &parms->source_mac,
++            &parms->router_mac_ipv4,
++            &parms->router_mac_ipv6);
+         if (err != 0)
+             exit(1);
+         parms->adapter = masscan->nic[index].adapter;
+-        if (!masscan->nic[index].is_usable) {
++        if (!masscan->nic[index].is_usable)
++        {
+             LOG(0, "FAIL: failed to detect IP of interface\n");
+             LOG(0, " [hint] did you spell the name correctly?\n");
+             LOG(0, " [hint] if it has no IP address, "
+-                    "manually set with \"--adapter-ip 192.168.100.5\"\n");
++                   "manually set with \"--adapter-ip 192.168.100.5\"\n");
+             exit(1);
+         }
+ 
+-
+         /*
+          * Initialize the TCP packet template. The way this works is that
+          * we parse an existing TCP packet, and use that as the template for
+@@ -1295,19 +1318,20 @@ main_scan(struct Masscan *masscan)
+          */
+         parms->tmplset->vulncheck = vulncheck;
+         template_packet_init(
+-                    parms->tmplset,
+-                    parms->source_mac,
+-                    parms->router_mac_ipv4,
+-                    parms->router_mac_ipv6,
+-                    masscan->payloads.udp,
+-                    masscan->payloads.oproto,
+-                    stack_if_datalink(masscan->nic[index].adapter),
+-                    masscan->seed);
++            parms->tmplset,
++            parms->source_mac,
++            parms->router_mac_ipv4,
++            parms->router_mac_ipv6,
++            masscan->payloads.udp,
++            masscan->payloads.oproto,
++            stack_if_datalink(masscan->nic[index].adapter),
++            masscan->seed);
+ 
+         /*
+          * Set the "source port" of everything we transmit.
+          */
+-        if (masscan->nic[index].src.port.range == 0) {
++        if (masscan->nic[index].src.port.range == 0)
++        {
+             unsigned port = 40000 + now % 20000;
+             masscan->nic[index].src.port.first = port;
+             masscan->nic[index].src.port.last = port;
+@@ -1326,12 +1350,10 @@ main_scan(struct Masscan *masscan)
+         if (masscan->nic[0].is_vlan)
+             template_set_vlan(parms->tmplset, masscan->nic[0].vlan_id);
+ 
+-
+         /*
+          * trap <ctrl-c> to pause
+          */
+         signal(SIGINT, control_c_handler);
+-
+     }
+ 
+     /*
+@@ -1347,29 +1369,30 @@ main_scan(struct Masscan *masscan)
+         LOG(0, "Starting masscan " MASSCAN_VERSION " (http://bit.ly/14GZzcT) at %s\n",
+             buffer);
+ 
+-        if (count_ports == 1 && \
+-            masscan->targets.ports.list->begin == Templ_ICMP_echo && \
++        if (count_ports == 1 &&
++            masscan->targets.ports.list->begin == Templ_ICMP_echo &&
+             masscan->targets.ports.list->end == Templ_ICMP_echo)
+-            { /* ICMP only */
+-                //LOG(0, " -- forced options: -sn -n --randomize-hosts -v --send-eth\n");
+-                LOG(0, "Initiating ICMP Echo Scan\n");
+-                LOG(0, "Scanning %u hosts\n",(unsigned)count_ips);
+-             }
++        { /* ICMP only */
++            //LOG(0, " -- forced options: -sn -n --randomize-hosts -v --send-eth\n");
++            LOG(0, "Initiating ICMP Echo Scan\n");
++            LOG(0, "Scanning %u hosts\n", (unsigned)count_ips);
++        }
+         else /* This could actually also be a UDP only or mixed UDP/TCP/ICMP scan */
+-            {
+-                //LOG(0, " -- forced options: -sS -Pn -n --randomize-hosts -v --send-eth\n");
+-                LOG(0, "Initiating SYN Stealth Scan\n");
+-                LOG(0, "Scanning %u hosts [%u port%s/host]\n",
+-                    (unsigned)count_ips, (unsigned)count_ports, (count_ports==1)?"":"s");
+-            }
++        {
++            //LOG(0, " -- forced options: -sS -Pn -n --randomize-hosts -v --send-eth\n");
++            LOG(0, "Initiating SYN Stealth Scan\n");
++            LOG(0, "Scanning %u hosts [%u port%s/host]\n",
++                (unsigned)count_ips, (unsigned)count_ports, (count_ports == 1) ? "" : "s");
++        }
+     }
+-    
++
+     /*
+      * Start all the threads
+      */
+-    for (index=0; index<masscan->nic_count; index++) {
++    for (index = 0; index < masscan->nic_count; index++)
++    {
+         struct ThreadPair *parms = &parms_array[index];
+-        
++
+         /*
+          * Start the scanning thread.
+          * THIS IS WHERE THE PROGRAM STARTS SPEWING OUT PACKETS AT A HIGH
+@@ -1391,17 +1414,18 @@ main_scan(struct Masscan *masscan)
+     LOG(1, "[+] waiting for threads to finish\n");
+     status_start(&status);
+     status.is_infinite = masscan->is_infinite;
+-    while (!is_tx_done && masscan->output.is_status_updates) {
++    while (!is_tx_done && masscan->output.is_status_updates)
++    {
+         unsigned i;
+         double rate = 0;
+         uint64_t total_tcbs = 0;
+         uint64_t total_synacks = 0;
+         uint64_t total_syns = 0;
+ 
+-
+         /* Find the minimum index of all the threads */
+         min_index = UINT64_MAX;
+-        for (i=0; i<masscan->nic_count; i++) {
++        for (i = 0; i < masscan->nic_count; i++)
++        {
+             struct ThreadPair *parms = &parms_array[i];
+ 
+             if (min_index > parms->my_index)
+@@ -1417,7 +1441,8 @@ main_scan(struct Masscan *masscan)
+                 total_syns += *parms->total_syns;
+         }
+ 
+-        if (min_index >= range && !masscan->is_infinite) {
++        if (min_index >= range && !masscan->is_infinite)
++        {
+             /* Note: This is how we can tell the scan has ended */
+             is_tx_done = 1;
+         }
+@@ -1428,8 +1453,8 @@ main_scan(struct Masscan *masscan)
+          */
+         if (masscan->output.is_status_updates)
+             status_print(&status, min_index, range, rate,
+-                total_tcbs, total_synacks, total_syns,
+-                0, masscan->output.is_status_ndjson);
++                         total_tcbs, total_synacks, total_syns,
++                         0, masscan->output.is_status_ndjson);
+ 
+         /* Sleep for almost a second */
+         pixie_mssleep(750);
+@@ -1439,20 +1464,20 @@ main_scan(struct Masscan *masscan)
+      * If we haven't completed the scan, then save the resume
+      * information.
+      */
+-    if (min_index < count_ips * count_ports) {
++    if (min_index < count_ips * count_ports)
++    {
+         masscan->resume.index = min_index;
+ 
+         /* Write current settings to "paused.conf" so that the scan can be restarted */
+         masscan_save_state(masscan);
+     }
+ 
+-
+-
+     /*
+      * Now wait for all threads to exit
+      */
+     now = time(0);
+-    for (;;) {
++    for (;;)
++    {
+         unsigned transmit_count = 0;
+         unsigned receive_count = 0;
+         unsigned i;
+@@ -1461,10 +1486,10 @@ main_scan(struct Masscan *masscan)
+         uint64_t total_synacks = 0;
+         uint64_t total_syns = 0;
+ 
+-
+         /* Find the minimum index of all the threads */
+         min_index = UINT64_MAX;
+-        for (i=0; i<masscan->nic_count; i++) {
++        for (i = 0; i < masscan->nic_count; i++)
++        {
+             struct ThreadPair *parms = &parms_array[i];
+ 
+             if (min_index > parms->my_index)
+@@ -1480,29 +1505,30 @@ main_scan(struct Masscan *masscan)
+                 total_syns += *parms->total_syns;
+         }
+ 
+-
+-
+-        if (time(0) - now >= masscan->wait) {
++        if (time(0) - now >= masscan->wait)
++        {
+             is_rx_done = 1;
+         }
+ 
+-        if (time(0) - now - 10 > masscan->wait) {
++        if (time(0) - now - 10 > masscan->wait)
++        {
+             LOG(0, "[-] Passed the wait window but still running, forcing exit...\n");
+             exit(0);
+         }
+ 
+-        if (masscan->output.is_status_updates) {
++        if (masscan->output.is_status_updates)
++        {
+             status_print(&status, min_index, range, rate,
+-                total_tcbs, total_synacks, total_syns,
+-                masscan->wait - (time(0) - now),
+-                masscan->output.is_status_ndjson);
++                         total_tcbs, total_synacks, total_syns,
++                         masscan->wait - (time(0) - now),
++                         masscan->output.is_status_ndjson);
+ 
+-            for (i=0; i<masscan->nic_count; i++) {
++            for (i = 0; i < masscan->nic_count; i++)
++            {
+                 struct ThreadPair *parms = &parms_array[i];
+ 
+                 transmit_count += parms->done_transmitting;
+                 receive_count += parms->done_receiving;
+-
+             }
+ 
+             pixie_mssleep(250);
+@@ -1513,13 +1539,15 @@ main_scan(struct Masscan *masscan)
+             is_rx_done = 1;
+             if (receive_count < masscan->nic_count)
+                 continue;
+-
+-        } else {
++        }
++        else
++        {
+             /* [AFL-fuzz]
+              * Join the threads, which doesn't allow us to print out 
+              * status messages, but allows us to exit cleanly without
+              * any waiting */
+-            for (i=0; i<masscan->nic_count; i++) {
++            for (i = 0; i < masscan->nic_count; i++)
++            {
+                 struct ThreadPair *parms = &parms_array[i];
+ 
+                 pixie_thread_join(parms->thread_handle_xmit);
+@@ -1534,26 +1562,23 @@ main_scan(struct Masscan *masscan)
+         break;
+     }
+ 
+-
+     /*
+      * Now cleanup everything
+      */
+     status_finish(&status);
+ 
+-    if (!masscan->output.is_status_updates) {
++    if (!masscan->output.is_status_updates)
++    {
+         uint64_t usec_now = pixie_gettime();
+ 
+-        printf("%u milliseconds elapsed\n", (unsigned)((usec_now - usec_start)/1000));
++        printf("%u milliseconds elapsed\n", (unsigned)((usec_now - usec_start) / 1000));
+     }
+-    
++
+     LOG(1, "[+] all threads have exited                    \n");
+ 
+     return 0;
+ }
+ 
+-
+-
+-
+ /***************************************************************************
+  ***************************************************************************/
+ int main(int argc, char *argv[])
+@@ -1562,10 +1587,13 @@ int main(int argc, char *argv[])
+     unsigned i;
+     int has_target_addresses = 0;
+     int has_target_ports = 0;
+-    
++
+     usec_start = pixie_gettime();
+ #if defined(WIN32)
+-    {WSADATA x; WSAStartup(0x101, &x);}
++    {
++        WSADATA x;
++        WSAStartup(0x101, &x);
++    }
+ #endif
+ 
+     global_now = time(0);
+@@ -1573,14 +1601,15 @@ int main(int argc, char *argv[])
+     /* Set system to report debug information on crash */
+     {
+         int is_backtrace = 1;
+-        for (i=1; i<(unsigned)argc; i++) {
++        for (i = 1; i < (unsigned)argc; i++)
++        {
+             if (strcmp(argv[i], "--nobacktrace") == 0)
+                 is_backtrace = 0;
+         }
+         if (is_backtrace)
+             pixie_backtrace_init(argv[0]);
+     }
+-    
++
+     /*
+      * Initialize those defaults that aren't zero
+      */
+@@ -1588,25 +1617,26 @@ int main(int argc, char *argv[])
+     /* 14 rounds seem to give way better statistical distribution than 4 with a 
+     very low impact on scan rate */
+     masscan->blackrock_rounds = 14;
+-    masscan->output.is_show_open = 1; /* default: show syn-ack, not rst */
++    masscan->output.is_show_open = 1;      /* default: show syn-ack, not rst */
+     masscan->output.is_status_updates = 1; /* default: show status updates */
+-    masscan->wait = 10; /* how long to wait for responses when done */
+-    masscan->max_rate = 100.0; /* max rate = hundred packets-per-second */
++    masscan->wait = 10;                    /* how long to wait for responses when done */
++    masscan->max_rate = 100.0;             /* max rate = hundred packets-per-second */
+     masscan->nic_count = 1;
+     masscan->shard.one = 1;
+     masscan->shard.of = 1;
+     masscan->min_packet_size = 60;
+     masscan->payloads.udp = payloads_udp_create();
+     masscan->payloads.oproto = payloads_oproto_create();
+-    strcpy_s(   masscan->output.rotate.directory,
+-                sizeof(masscan->output.rotate.directory),
+-                ".");
++    strcpy_s(masscan->output.rotate.directory,
++             sizeof(masscan->output.rotate.directory),
++             ".");
+     masscan->is_capture_cert = 1;
+ 
+     /*
+      * Pre-parse the command-line
+      */
+-    if (masscan_conf_contains("--readscan", argc, argv)) {
++    if (masscan_conf_contains("--readscan", argc, argv))
++    {
+         masscan->is_readscan = 1;
+     }
+ 
+@@ -1619,8 +1649,10 @@ int main(int argc, char *argv[])
+      * makes a mistake
+      */
+ #if !defined(WIN32)
+-    if (!masscan->is_readscan) {
+-        if (access("/etc/masscan/masscan.conf", 0) == 0) {
++    if (!masscan->is_readscan)
++    {
++        if (access("/etc/masscan/masscan.conf", 0) == 0)
++        {
+             masscan_read_config_file(masscan, "/etc/masscan/masscan.conf");
+         }
+     }
+@@ -1656,7 +1688,6 @@ int main(int argc, char *argv[])
+     snmp_init();
+     x509_init();
+ 
+-
+     /*
+      * Apply excludes. People ask us not to scan them, so we maintain a list
+      * of their ranges, and when doing wide scans, add the exclude list to
+@@ -1668,15 +1699,12 @@ int main(int argc, char *argv[])
+     if (!has_target_ports && masscan->op == Operation_ListScan)
+         massip_add_port_string(&masscan->targets, "80", 0);
+ 
+-
+-
+-
+     /* Optimize target selection so it's a quick binary search instead
+      * of walking large memory tables. When we scan the entire Internet
+      * our --excludefile will chop up our pristine 0.0.0.0/0 range into
+      * hundreds of subranges. This allows us to grab addresses faster. */
+     massip_optimize(&masscan->targets);
+-    
++
+     /* FIXME: we only support 63-bit scans at the current time.
+      * This is big enough for the IPv4 Internet, where scanning
+      * for all TCP ports on all IPv4 addresses results in a 48-bit
+@@ -1689,7 +1717,8 @@ int main(int argc, char *argv[])
+      * difficult for 32-bit processors, for now, I'm going to stick
+      * to a simple 63-bit scan.
+      */
+-    if (massint128_bitcount(massip_range(&masscan->targets)) > 63) {
++    if (massint128_bitcount(massip_range(&masscan->targets)) > 63)
++    {
+         fprintf(stderr, "[-] FAIL: scan range too large, max is 63-bits, requested is %u bits\n",
+                 massint128_bitcount(massip_range(&masscan->targets)));
+         fprintf(stderr, "    Hint: scan range is number of IP addresses times number of ports\n");
+@@ -1701,7 +1730,8 @@ int main(int argc, char *argv[])
+      * Once we've read in the configuration, do the operation that was
+      * specified
+      */
+-    switch (masscan->op) {
++    switch (masscan->op)
++    {
+     case Operation_Default:
+         /* Print usage info and exit */
+         masscan_usage();
+@@ -1711,23 +1741,31 @@ int main(int argc, char *argv[])
+         /*
+          * THIS IS THE NORMAL THING
+          */
+-        if (rangelist_count(&masscan->targets.ipv4) == 0 && massint128_is_zero(range6list_count(&masscan->targets.ipv6))) {
++        if (rangelist_count(&masscan->targets.ipv4) == 0 && massint128_is_zero(range6list_count(&masscan->targets.ipv6)))
++        {
+             /* We check for an empty target list here first, before the excludes,
+              * so that we can differentiate error messages after excludes, in case
+              * the user specified addresses, but they were removed by excludes. */
+             LOG(0, "FAIL: target IP address list empty\n");
+-            if (has_target_addresses) {
++            if (has_target_addresses)
++            {
+                 LOG(0, " [hint] all addresses were removed by exclusion ranges\n");
+-            } else {
++            }
++            else
++            {
+                 LOG(0, " [hint] try something like \"--range 10.0.0.0/8\"\n");
+                 LOG(0, " [hint] try something like \"--range 192.168.0.100-192.168.0.200\"\n");
+             }
+             exit(1);
+         }
+-        if (rangelist_count(&masscan->targets.ports) == 0) {
+-            if (has_target_ports) {
++        if (rangelist_count(&masscan->targets.ports) == 0)
++        {
++            if (has_target_ports)
++            {
+                 LOG(0, " [hint] all ports were removed by exclusion ranges\n");
+-            } else {
++            }
++            else
++            {
+                 LOG(0, "FAIL: no ports were specified\n");
+                 LOG(0, " [hint] try something like \"-p80,8000-9000\"\n");
+                 LOG(0, " [hint] try something like \"--ports 0-65535\"\n");
+@@ -1747,7 +1785,7 @@ int main(int argc, char *argv[])
+         break;
+ 
+     case Operation_DebugIF:
+-        for (i=0; i<masscan->nic_count; i++)
++        for (i = 0; i < masscan->nic_count; i++)
+             rawsock_selftest_if(masscan->nic[i].ifname);
+         return 0;
+ 
+@@ -1756,33 +1794,34 @@ int main(int argc, char *argv[])
+         return 0;
+ 
+     case Operation_ReadScan:
+-        {
+-            unsigned start;
+-            unsigned stop;
++    {
++        unsigned start;
++        unsigned stop;
+ 
+-            /* find first file */
+-            for (start=1; start<(unsigned)argc; start++) {
+-                if (memcmp(argv[start], "--readscan", 10) == 0) {
+-                    start++;
+-                    break;
+-                }
++        /* find first file */
++        for (start = 1; start < (unsigned)argc; start++)
++        {
++            if (memcmp(argv[start], "--readscan", 10) == 0)
++            {
++                start++;
++                break;
+             }
++        }
+ 
+-            /* find last file */
+-            for (stop=start+1; stop<(unsigned)argc && argv[stop][0] != '-'; stop++)
+-                ;
++        /* find last file */
++        for (stop = start + 1; stop < (unsigned)argc && argv[stop][0] != '-'; stop++)
++            ;
+ 
+-            /*
++        /*
+              * read the binary files, and output them again depending upon
+              * the output parameters
+              */
+-            read_binary_scanfile(masscan, start, stop, argv);
+-
+-        }
+-        break;
++        read_binary_scanfile(masscan, start, stop, argv);
++    }
++    break;
+ 
+     case Operation_Benchmark:
+-        printf("=== benchmarking (%u-bits) ===\n\n", (unsigned)sizeof(void*)*8);
++        printf("=== benchmarking (%u-bits) ===\n\n", (unsigned)sizeof(void *) * 8);
+         blackrock_benchmark(masscan->blackrock_rounds);
+         blackrock2_benchmark(masscan->blackrock_rounds);
+         smack_benchmark();
+@@ -1833,12 +1872,14 @@ int main(int argc, char *argv[])
+             x += nmapserviceprobes_selftest();
+             x += rstfilter_selftest();
+ 
+-
+-            if (x != 0) {
++            if (x != 0)
++            {
+                 /* one of the selftests failed, so return error */
+                 fprintf(stderr, "regression test: failed :( \n");
+                 return 1;
+-            } else {
++            }
++            else
++            {
+                 fprintf(stderr, "regression test: success!\n");
+                 return 0;
+             }
+@@ -1846,8 +1887,5 @@ int main(int argc, char *argv[])
+         break;
+     }
+ 
+-
+     return 0;
+ }
+-
+-
+diff --git a/src/out-json.c b/src/out-json.c
+index 5d91e43..2c0f8cd 100644
+--- a/src/out-json.c
++++ b/src/out-json.c
+@@ -4,7 +4,6 @@
+ #include "string_s.h"
+ #include <ctype.h>
+ 
+-
+ /****************************************************************************
+  ****************************************************************************/
+ static void
+@@ -14,7 +13,6 @@ json_out_open(struct Output *out, FILE *fp)
+     fprintf(fp, "[\n"); // enclose the atomic {}'s into an []
+ }
+ 
+-
+ /****************************************************************************
+  ****************************************************************************/
+ static void
+@@ -29,12 +27,12 @@ json_out_close(struct Output *out, FILE *fp)
+  ****************************************************************************/
+ static void
+ json_out_status(struct Output *out, FILE *fp, time_t timestamp, int status,
+-               ipaddress ip, unsigned ip_proto, unsigned port, unsigned reason, unsigned ttl)
++                ipaddress ip, unsigned ip_proto, unsigned port, unsigned reason, unsigned ttl)
+ {
+     char reason_buffer[128];
+     ipaddress_formatted_t fmt;
+     UNUSEDPARM(out);
+-    //UNUSEDPARM(timestamp);
++    // UNUSEDPARM(timestamp);
+ 
+     /* Trailing comma breaks some JSON parsers. We don't know precisely when
+      * we'll end, but we do know when we begin, so instead of appending
+@@ -43,22 +41,19 @@ json_out_status(struct Output *out, FILE *fp, time_t timestamp, int status,
+         fprintf(fp, ",\n");
+     else
+         out->is_first_record_seen = 1;
+-    
++
+     fprintf(fp, "{ ");
+     fmt = ipaddress_fmt(ip);
+     fprintf(fp, "  \"ip\": \"%s\", ", fmt.string);
+     fprintf(fp, "  \"timestamp\": \"%d\", \"ports\": [ {\"port\": %u, \"proto\": \"%s\", \"status\": \"%s\","
+                 " \"reason\": \"%s\", \"ttl\": %u} ] ",
+-                (int) timestamp,
+-                port,
+-                name_from_ip_proto(ip_proto),
+-                status_string(status),
+-                reason_string(reason, reason_buffer, sizeof(reason_buffer)),
+-                ttl
+-            );
++            (int)timestamp,
++            port,
++            name_from_ip_proto(ip_proto),
++            status_string(status),
++            reason_string(reason, reason_buffer, sizeof(reason_buffer)),
++            ttl);
+     fprintf(fp, "}\n");
+-
+-
+ }
+ 
+ /*****************************************************************************
+@@ -67,26 +62,30 @@ json_out_status(struct Output *out, FILE *fp, time_t timestamp, int status,
+  *****************************************************************************/
+ static const char *
+ normalize_json_string(const unsigned char *px, size_t length,
+-                 char *buf, size_t buf_len)
++                      char *buf, size_t buf_len)
+ {
+-    size_t i=0;
++    size_t i = 0;
+     size_t offset = 0;
+ 
+-
+-    for (i=0; i<length; i++) {
++    for (i = 0; i < length; i++)
++    {
+         unsigned char c = px[i];
+ 
+-        if (isprint(c) && c != '<' && c != '>' && c != '&' && c != '\\' && c != '\"' && c != '\'') {
++        if (isprint(c) && c != '<' && c != '>' && c != '&' && c != '\\' && c != '\"' && c != '\'')
++        {
+             if (offset + 2 < buf_len)
+                 buf[offset++] = px[i];
+-        } else {
+-            if (offset + 7 < buf_len) {
++        }
++        else
++        {
++            if (offset + 7 < buf_len)
++            {
+                 buf[offset++] = '\\';
+                 buf[offset++] = 'u';
+                 buf[offset++] = '0';
+                 buf[offset++] = '0';
+-                buf[offset++] = "0123456789abcdef"[px[i]>>4];
+-                buf[offset++] = "0123456789abcdef"[px[i]&0xF];
++                buf[offset++] = "0123456789abcdef"[px[i] >> 4];
++                buf[offset++] = "0123456789abcdef"[px[i] & 0xF];
+             }
+         }
+     }
+@@ -100,10 +99,10 @@ normalize_json_string(const unsigned char *px, size_t length,
+  ******************************************************************************/
+ static void
+ json_out_banner(struct Output *out, FILE *fp, time_t timestamp,
+-               ipaddress ip, unsigned ip_proto, unsigned port,
+-               enum ApplicationProtocol proto,
+-               unsigned ttl,
+-               const unsigned char *px, unsigned length)
++                ipaddress ip, unsigned ip_proto, unsigned port,
++                enum ApplicationProtocol proto,
++                unsigned ttl,
++                const unsigned char *px, unsigned length)
+ {
+     char banner_buffer[65536];
+     ipaddress_formatted_t fmt;
+@@ -117,17 +116,16 @@ json_out_banner(struct Output *out, FILE *fp, time_t timestamp,
+         fprintf(fp, ",\n");
+     else
+         out->is_first_record_seen = 1;
+-    
++
+     fprintf(fp, "{ ");
+     fmt = ipaddress_fmt(ip);
+     fprintf(fp, "  \"ip\": \"%s\", ", fmt.string);
+     fprintf(fp, "  \"timestamp\": \"%d\", \"ports\": [ {\"port\": %u, \"proto\": \"%s\", \"service\": {\"name\": \"%s\", \"banner\": \"%s\"} } ] ",
+-            (int) timestamp,
++            (int)timestamp,
+             port,
+             name_from_ip_proto(ip_proto),
+             masscan_app_to_string(proto),
+-            normalize_json_string(px, length, banner_buffer, sizeof(banner_buffer))
+-            );
++            normalize_json_string(px, length, banner_buffer, sizeof(banner_buffer)));
+     fprintf(fp, "}\n");
+ 
+     UNUSEDPARM(out);
+@@ -141,5 +139,4 @@ const struct OutputType json_output = {
+     json_out_open,
+     json_out_close,
+     json_out_status,
+-    json_out_banner
+-};
++    json_out_banner};
+diff --git a/src/proto-banner1.c b/src/proto-banner1.c
+index 08f8b83..730fe0f 100644
+--- a/src/proto-banner1.c
++++ b/src/proto-banner1.c
+@@ -27,14 +27,20 @@
+ #include <string.h>
+ #include <stddef.h>
+ 
+-
+-
+ struct Patterns patterns[] = {
+-    {"\x00\x00" "**" "\xff" "SMB", 8, PROTO_SMB, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
+-    {"\x00\x00" "**" "\xfe" "SMB", 8, PROTO_SMB, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
+-    
++    {"\x00\x00"
++     "**"
++     "\xff"
++     "SMB",
++     8, PROTO_SMB, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
++    {"\x00\x00"
++     "**"
++     "\xfe"
++     "SMB",
++     8, PROTO_SMB, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
++
+     {"\x82\x00\x00\x00", 4, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Positive Session Response */
+-    
++
+     {"\x83\x00\x00\x01\x80", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Not listening on called name */
+     {"\x83\x00\x00\x01\x81", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Not listening for calling name */
+     {"\x83\x00\x00\x01\x82", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Called name not present */
+@@ -42,36 +48,35 @@ struct Patterns patterns[] = {
+     {"\x83\x00\x00\x01\x8f", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Unspecified error */
+ 
+     /* ...the remainder can be in any order */
+-    {"SSH-1.",      6, PROTO_SSH1, SMACK_ANCHOR_BEGIN, 0},
+-    {"SSH-2.",      6, PROTO_SSH2, SMACK_ANCHOR_BEGIN, 0},
+-    {"HTTP/1.",     7, PROTO_HTTP, SMACK_ANCHOR_BEGIN, 0},
+-    {"220-",        4, PROTO_FTP, SMACK_ANCHOR_BEGIN, 0},
+-    {"220 ",        4, PROTO_FTP, SMACK_ANCHOR_BEGIN, 1},
+-    {"+OK ",        4, PROTO_POP3, SMACK_ANCHOR_BEGIN, 0},
+-    {"* OK ",       5, PROTO_IMAP4, SMACK_ANCHOR_BEGIN, 0},
+-    {"521 ",        4, PROTO_SMTP, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x16\x03\x00",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x16\x03\x01",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x16\x03\x02",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x16\x03\x03",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x15\x03\x00",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x15\x03\x01",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x15\x03\x02",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+-    {"\x15\x03\x03",3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"SSH-1.", 6, PROTO_SSH1, SMACK_ANCHOR_BEGIN, 0},
++    {"SSH-2.", 6, PROTO_SSH2, SMACK_ANCHOR_BEGIN, 0},
++    {"HTTP/1.", 7, PROTO_HTTP, SMACK_ANCHOR_BEGIN, 0},
++    {"220-", 4, PROTO_FTP, SMACK_ANCHOR_BEGIN, 0},
++    {"220 ", 4, PROTO_FTP, SMACK_ANCHOR_BEGIN, 1},
++    {"+OK ", 4, PROTO_POP3, SMACK_ANCHOR_BEGIN, 0},
++    {"* OK ", 5, PROTO_IMAP4, SMACK_ANCHOR_BEGIN, 0},
++    {"521 ", 4, PROTO_SMTP, SMACK_ANCHOR_BEGIN, 0},
++    {"\x16\x03\x00", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x16\x03\x01", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x16\x03\x02", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x16\x03\x03", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x15\x03\x00", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x15\x03\x01", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x15\x03\x02", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
++    {"\x15\x03\x03", 3, PROTO_SSL3, SMACK_ANCHOR_BEGIN, 0},
+     {"RFB 000.000\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 1}, /* UltraVNC repeater mode */
+     {"RFB 003.003\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 3}, /* default version for everything */
+     {"RFB 003.005\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 3}, /* broken, same as 003.003 */
+     {"RFB 003.006\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 3}, /* broken, same as 003.003 */
+-    {"RFB 003.007\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 7}, 
+-    {"RFB 003.008\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8}, 
++    {"RFB 003.007\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 7},
++    {"RFB 003.008\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8},
+     {"RFB 003.889\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8}, /* Apple's remote desktop, 003.007 */
+-    {"RFB 003.009\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8}, 
++    {"RFB 003.009\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8},
+     {"RFB 004.000\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8}, /* Intel AMT KVM */
+     {"RFB 004.001\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8}, /* RealVNC 4.6 */
+     {"RFB 004.002\n", 12, PROTO_VNC_RFB, SMACK_ANCHOR_BEGIN, 8},
+-    {"STAT pid ",      9, PROTO_MEMCACHED,SMACK_ANCHOR_BEGIN, 0}, /* memcached stat response */
+-    
+-    
++    {"STAT pid ", 9, PROTO_MEMCACHED, SMACK_ANCHOR_BEGIN, 0}, /* memcached stat response */
++
+     {"\xff\xfb\x01\xff\xf0", 5, PROTO_TELNET, 0, 0},
+     {"\xff\xfb\x01\xff\xfb", 5, PROTO_TELNET, 0, 0},
+     {"\xff\xfb\x01\xff\xfc", 5, PROTO_TELNET, 0, 0},
+@@ -87,63 +92,61 @@ struct Patterns patterns[] = {
+     {"\xff\xfd\x20\xff\xfd", 5, PROTO_TELNET, 0, 0},
+     {"\xff\xfd\x23\xff\xfd", 5, PROTO_TELNET, 0, 0},
+     {"\xff\xfd\x27\xff\xfd", 5, PROTO_TELNET, 0, 0},
+-    {"\xff\xfb\x01\x1b[",    5, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    {"\xff\xfb\x01Input",    8, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    {"\xff\xfb\x01   ",      6, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    {"\xff\xfb\x01login",    8, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    {"login:",               6, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    {"password:",            9, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
+-    
++    {"\xff\xfb\x01\x1b[", 5, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++    {"\xff\xfb\x01Input", 8, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++    {"\xff\xfb\x01   ", 6, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++    {"\xff\xfb\x01login", 8, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++    {"login:", 6, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++    {"password:", 9, PROTO_TELNET, SMACK_ANCHOR_BEGIN, 0},
++
+     {"\x03\x00\x00\x13\x0e\xd0\xbe\xef\x12\x34\x00\x02\x0f\x08\x00\x00\x00\x00\x00",
+-        12, PROTO_RDP, SMACK_ANCHOR_BEGIN, 0},
++     12, PROTO_RDP, SMACK_ANCHOR_BEGIN, 0},
+     {"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x0f\x08\x00\x00\x00\x00\x00",
+-        12, PROTO_RDP, SMACK_ANCHOR_BEGIN, 0},
+-
+-    {0,0,0,0,0}
+-};
+-
+-
++     12, PROTO_RDP, SMACK_ANCHOR_BEGIN, 0},
+ 
++    {0, 0, 0, 0, 0}};
+ 
+ /***************************************************************************
+  ***************************************************************************/
+ unsigned
+ banner1_parse(
+-        const struct Banner1 *banner1,
+-        struct ProtocolState *tcb_state,
+-        const unsigned char *px, size_t length,
+-        struct BannerOutput *banout,
+-        struct InteractiveData *more)
++    const struct Banner1 *banner1,
++    struct ProtocolState *tcb_state,
++    const unsigned char *px, size_t length,
++    struct BannerOutput *banout,
++    struct InteractiveData *more)
+ {
+     size_t x;
+     unsigned offset = 0;
+     unsigned proto;
+ 
+-
+-    switch (tcb_state->app_proto) {
++    switch (tcb_state->app_proto)
++    {
+     case PROTO_NONE:
+     case PROTO_HEUR:
+         x = smack_search_next(
+-                        banner1->smack,
+-                        &tcb_state->state,
+-                        px, &offset, (unsigned)length);
++            banner1->smack,
++            &tcb_state->state,
++            px, &offset, (unsigned)length);
+         if (x != SMACK_NOT_FOUND)
+             proto = patterns[x].id;
+         else
+             proto = 0xFFFFFFFF;
+-        if (proto != 0xFFFFFFFF
+-            && !(proto == PROTO_SSL3 && !tcb_state->is_sent_sslhello)) {
++        if (proto != 0xFFFFFFFF && !(proto == PROTO_SSL3 && !tcb_state->is_sent_sslhello))
++        {
+             unsigned i;
+ 
+             /* re-read the stuff that we missed */
+-            for (i=0; patterns[i].id && patterns[i].id != tcb_state->app_proto; i++)
++            for (i = 0; patterns[i].id && patterns[i].id != tcb_state->app_proto; i++)
+                 ;
+ 
+             /* Kludge: patterns look confusing, so add port info to the
+              * pattern */
+-            switch (proto) {
++            switch (proto)
++            {
+             case PROTO_FTP:
+-                if (patterns[x].extra == 1) {
++                if (patterns[x].extra == 1)
++                {
+                     if (tcb_state->port == 25 || tcb_state->port == 587)
+                         proto = PROTO_SMTP;
+                 }
+@@ -164,155 +167,155 @@ banner1_parse(
+                 unsigned s_len = banout_string_length(banout, PROTO_HEUR);
+ 
+                 if (s && s_len)
+-                banner1_parse(
+-                                banner1,
+-                                tcb_state,
+-                                s, s_len,
+-                                banout,
+-                                more);
++                    banner1_parse(
++                        banner1,
++                        tcb_state,
++                        s, s_len,
++                        banout,
++                        more);
+             }
+             banner1_parse(
+-                            banner1,
++                banner1,
++                tcb_state,
++                px, length,
++                banout,
++                more);
++        }
++        else
++        {
++            banout_append(banout, PROTO_HEUR, px, length);
++        }
++        break;
++    case PROTO_FTP:
++        banner_ftp.parse(banner1,
++                         banner1->http_fields,
++                         tcb_state,
++                         px, length,
++                         banout,
++                         more);
++        break;
++    case PROTO_SMTP:
++        banner_smtp.parse(banner1,
++                          banner1->http_fields,
++                          tcb_state,
++                          px, length,
++                          banout,
++                          more);
++        break;
++
++    case PROTO_TELNET:
++        banner_telnet.parse(banner1,
++                            banner1->http_fields,
+                             tcb_state,
+                             px, length,
+                             banout,
+                             more);
+-        } else {
+-            banout_append(banout, PROTO_HEUR, px, length);
+-        }
+         break;
+-    case PROTO_FTP:
+-            banner_ftp.parse(   banner1,
+-                             banner1->http_fields,
+-                             tcb_state,
+-                             px, length,
+-                             banout,
+-                             more);
+-            break;
+-        case PROTO_SMTP:
+-            banner_smtp.parse(   banner1,
+-                              banner1->http_fields,
+-                              tcb_state,
+-                              px, length,
+-                              banout,
+-                              more);
+-            break;
+-            
+-        case PROTO_TELNET:
+-            banner_telnet.parse(   banner1,
+-                              banner1->http_fields,
+-                              tcb_state,
+-                              px, length,
+-                              banout,
+-                              more);
+-            break;
+-        case PROTO_RDP:
+-            banner_rdp.parse(   banner1,
+-                                banner1->http_fields,
+-                                tcb_state,
+-                                px, length,
+-                                banout,
+-                                more);
+-            break;
+-        case PROTO_POP3:
+-            banner_pop3.parse(   banner1,
+-                              banner1->http_fields,
+-                              tcb_state,
+-                              px, length,
+-                              banout,
+-                              more);
+-            break;
++    case PROTO_RDP:
++        banner_rdp.parse(banner1,
++                         banner1->http_fields,
++                         tcb_state,
++                         px, length,
++                         banout,
++                         more);
++        break;
++    case PROTO_POP3:
++        banner_pop3.parse(banner1,
++                          banner1->http_fields,
++                          tcb_state,
++                          px, length,
++                          banout,
++                          more);
++        break;
+     case PROTO_IMAP4:
+-            banner_imap4.parse(banner1,
+-                              banner1->http_fields,
+-                              tcb_state,
+-                              px, length,
+-                              banout,
+-                              more);
+-            break;
+-            
++        banner_imap4.parse(banner1,
++                           banner1->http_fields,
++                           tcb_state,
++                           px, length,
++                           banout,
++                           more);
++        break;
++
+     case PROTO_SSH1:
+     case PROTO_SSH2:
+         /* generic text-based parser
+          * TODO: in future, need to split these into separate protocols,
+          * especially when binary parsing is added to SSH */
+-        banner_ssh.parse(   banner1,
+-                            banner1->http_fields,
+-                            tcb_state,
+-                            px, length,
+-                            banout,
+-                            more);
++        banner_ssh.parse(banner1,
++                         banner1->http_fields,
++                         tcb_state,
++                         px, length,
++                         banout,
++                         more);
+         break;
+     case PROTO_HTTP:
+         banner_http.parse(
+-                        banner1,
+-                        banner1->http_fields,
+-                        tcb_state,
+-                        px, length,
+-                        banout,
+-                        more);
++            banner1,
++            banner1->http_fields,
++            tcb_state,
++            px, length,
++            banout,
++            more);
+         break;
+     case PROTO_SSL3:
+         banner_ssl.parse(
+-                        banner1,
+-                        banner1->http_fields,
+-                        tcb_state,
+-                        px, length,
+-                        banout,
+-                        more);
++            banner1,
++            banner1->http_fields,
++            tcb_state,
++            px, length,
++            banout,
++            more);
+         break;
+     case PROTO_SMB:
+         banner_smb1.parse(
+-                        banner1,
+-                        banner1->http_fields,
+-                        tcb_state,
+-                        px, length,
+-                        banout,
+-                        more);
++            banner1,
++            banner1->http_fields,
++            tcb_state,
++            px, length,
++            banout,
++            more);
+         break;
+     case PROTO_VNC_RFB:
+-        banner_vnc.parse(    banner1,
+-                             banner1->http_fields,
+-                             tcb_state,
+-                             px, length,
+-                             banout,
+-                             more);
++        banner_vnc.parse(banner1,
++                         banner1->http_fields,
++                         tcb_state,
++                         px, length,
++                         banout,
++                         more);
+         break;
+     case PROTO_MEMCACHED:
+-        banner_memcached.parse(    banner1,
+-                             banner1->http_fields,
+-                             tcb_state,
+-                             px, length,
+-                             banout,
+-                             more);
++        banner_memcached.parse(banner1,
++                               banner1->http_fields,
++                               tcb_state,
++                               px, length,
++                               banout,
++                               more);
+         break;
+     case PROTO_SCRIPTING:
+-        banner_scripting.parse(    banner1,
+-                                   banner1->http_fields,
+-                                   tcb_state,
+-                                   px, length,
+-                                   banout,
+-                                   more);
++        banner_scripting.parse(banner1,
++                               banner1->http_fields,
++                               tcb_state,
++                               px, length,
++                               banout,
++                               more);
+         break;
+     case PROTO_VERSIONING:
+-        banner_versioning.parse(      banner1,
+-                                   banner1->http_fields,
+-                                   tcb_state,
+-                                   px, length,
+-                                   banout,
+-                                   more);
++        banner_versioning.parse(banner1,
++                                banner1->http_fields,
++                                tcb_state,
++                                px, length,
++                                banout,
++                                more);
+         break;
+ 
+     default:
+         fprintf(stderr, "banner1: internal error\n");
+         break;
+-
+     }
+ 
+     return tcb_state->app_proto;
+ }
+ 
+-
+ /***************************************************************************
+  * Create the --banners systems
+  ***************************************************************************/
+@@ -323,7 +326,6 @@ banner1_create(void)
+     unsigned i;
+ 
+     b = CALLOC(1, sizeof(*b));
+-    
+ 
+     /*
+      * This creates a pattern-matching blob for heuristically determining
+@@ -331,13 +333,13 @@ banner1_create(void)
+      * often respond with "220 " or VNC servers respond with "RFB".
+      */
+     b->smack = smack_create("banner1", SMACK_CASE_INSENSITIVE);
+-    for (i=0; patterns[i].pattern; i++)
++    for (i = 0; patterns[i].pattern; i++)
+         smack_add_pattern(
+-                    b->smack,
+-                    patterns[i].pattern,
+-                    patterns[i].pattern_length,
+-                    i,
+-                    patterns[i].is_anchored);
++            b->smack,
++            patterns[i].pattern,
++            patterns[i].pattern_length,
++            i,
++            patterns[i].is_anchored);
+     smack_compile(b->smack);
+ 
+     /*
+@@ -345,26 +347,26 @@ banner1_create(void)
+      */
+     b->payloads.tcp[80] = &banner_http;
+     b->payloads.tcp[8080] = &banner_http;
+-    b->payloads.tcp[139] = (void*)&banner_smb0;
+-    b->payloads.tcp[445] = (void*)&banner_smb1;
+-    b->payloads.tcp[443] = (void*)&banner_ssl;   /* HTTP/s */
+-    b->payloads.tcp[465] = (void*)&banner_ssl;   /* SMTP/s */
+-    b->payloads.tcp[990] = (void*)&banner_ssl;   /* FTP/s */
+-    b->payloads.tcp[991] = (void*)&banner_ssl;
+-    b->payloads.tcp[992] = (void*)&banner_ssl;   /* Telnet/s */
+-    b->payloads.tcp[993] = (void*)&banner_ssl;   /* IMAP4/s */
+-    b->payloads.tcp[994] = (void*)&banner_ssl;
+-    b->payloads.tcp[995] = (void*)&banner_ssl;   /* POP3/s */
+-    b->payloads.tcp[2083] = (void*)&banner_ssl;  /* cPanel - SSL */
+-    b->payloads.tcp[2087] = (void*)&banner_ssl;  /* WHM - SSL */
+-    b->payloads.tcp[2096] = (void*)&banner_ssl;  /* cPanel webmail - SSL */
+-    b->payloads.tcp[8443] = (void*)&banner_ssl;  /* Plesk Control Panel - SSL */
+-    b->payloads.tcp[9050] = (void*)&banner_ssl;  /* Tor */
+-    b->payloads.tcp[8140] = (void*)&banner_ssl;  /* puppet */
+-    b->payloads.tcp[11211] = (void*)&banner_memcached;
+-    b->payloads.tcp[23] = (void*)&banner_telnet;
+-    b->payloads.tcp[3389] = (void*)&banner_rdp;
+-    
++    b->payloads.tcp[139] = (void *)&banner_smb0;
++    b->payloads.tcp[445] = (void *)&banner_smb1;
++    b->payloads.tcp[443] = (void *)&banner_ssl; /* HTTP/s */
++    b->payloads.tcp[465] = (void *)&banner_ssl; /* SMTP/s */
++    b->payloads.tcp[990] = (void *)&banner_ssl; /* FTP/s */
++    b->payloads.tcp[991] = (void *)&banner_ssl;
++    b->payloads.tcp[992] = (void *)&banner_ssl; /* Telnet/s */
++    b->payloads.tcp[993] = (void *)&banner_ssl; /* IMAP4/s */
++    b->payloads.tcp[994] = (void *)&banner_ssl;
++    b->payloads.tcp[995] = (void *)&banner_ssl;  /* POP3/s */
++    b->payloads.tcp[2083] = (void *)&banner_ssl; /* cPanel - SSL */
++    b->payloads.tcp[2087] = (void *)&banner_ssl; /* WHM - SSL */
++    b->payloads.tcp[2096] = (void *)&banner_ssl; /* cPanel webmail - SSL */
++    b->payloads.tcp[8443] = (void *)&banner_ssl; /* Plesk Control Panel - SSL */
++    b->payloads.tcp[9050] = (void *)&banner_ssl; /* Tor */
++    b->payloads.tcp[8140] = (void *)&banner_ssl; /* puppet */
++    b->payloads.tcp[11211] = (void *)&banner_memcached;
++    b->payloads.tcp[23] = (void *)&banner_telnet;
++    b->payloads.tcp[3389] = (void *)&banner_rdp;
++
+     /* 
+      * This goes down the list of all the TCP protocol handlers and initializes
+      * them.
+@@ -382,20 +384,17 @@ banner1_create(void)
+     banner_telnet.init(b);
+     banner_rdp.init(b);
+     banner_vnc.init(b);
+-    
++
+     /* scripting/versioning come after the rest */
+     banner_scripting.init(b);
+     banner_versioning.init(b);
+ 
+-
+     return b;
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+-void
+-banner1_destroy(struct Banner1 *b)
++void banner1_destroy(struct Banner1 *b)
+ {
+     if (b == NULL)
+         return;
+@@ -406,28 +405,25 @@ banner1_destroy(struct Banner1 *b)
+     free(b);
+ }
+ 
+-
+-
+-
+-
+ /***************************************************************************
+  * Test the banner1 detection system by throwing random frames at it
+  ***************************************************************************/
+-void
+-banner1_test(const char *filename)
++void banner1_test(const char *filename)
+ {
+     struct PcapFile *cap;
+     unsigned link_type;
+ 
+     cap = pcapfile_openread(filename);
+-    if (cap == NULL) {
++    if (cap == NULL)
++    {
+         fprintf(stderr, "%s: can't open capture file\n", filename);
+         return;
+     }
+ 
+     link_type = pcapfile_datalink(cap);
+ 
+-    for (;;) {
++    for (;;)
++    {
+         int packets_read;
+         unsigned secs;
+         unsigned usecs;
+@@ -437,20 +433,17 @@ banner1_test(const char *filename)
+         struct PreprocessedInfo parsed;
+         unsigned x;
+ 
+-
+         packets_read = pcapfile_readframe(
+-                    cap,    /* capture dump file */
+-                    &secs, &usecs,
+-                    &origlength, &length,
+-                    px, sizeof(px));
++            cap, /* capture dump file */
++            &secs, &usecs,
++            &origlength, &length,
++            px, sizeof(px));
+         if (packets_read == 0)
+             break;
+ 
+-
+         x = preprocess_frame(px, length, link_type, &parsed);
+         if (x == 0)
+             continue;
+-
+     }
+ 
+     pcapfile_close(cap);
+@@ -458,8 +451,7 @@ banner1_test(const char *filename)
+ 
+ /***************************************************************************
+  ***************************************************************************/
+-int
+-banner1_selftest()
++int banner1_selftest()
+ {
+     unsigned i;
+     struct Banner1 *b;
+@@ -482,16 +474,15 @@ banner1_selftest()
+     px = (const unsigned char *)http_header;
+     length = (unsigned)strlen(http_header);
+ 
+-
+     /*
+      * First, test the "banout" subsystem
+      */
+-    if (banout_selftest() != 0) {
++    if (banout_selftest() != 0)
++    {
+         fprintf(stderr, "banout: failed\n");
+         return 1;
+     }
+ 
+-
+     /*
+      * Test one character at a time
+      */
+@@ -500,21 +491,22 @@ banner1_selftest()
+ 
+     memset(tcb_state, 0, sizeof(tcb_state[0]));
+ 
+-    for (i=0; i<length; i++) {
+-        struct InteractiveData more = {0,0};
++    for (i = 0; i < length; i++)
++    {
++        struct InteractiveData more = {0, 0};
+ 
+         banner1_parse(
+-                    b,
+-                    tcb_state,
+-                    px+i, 1,
+-                    banout,
+-                    &more);
++            b,
++            tcb_state,
++            px + i, 1,
++            banout,
++            &more);
+     }
+ 
+-
+     {
+         const unsigned char *s = banout_string(banout, PROTO_HTTP);
+-        if (memcmp(s, "HTTP/1.0 302", 11) != 0) {
++        if (memcmp(s, "HTTP/1.0 302", 11) != 0)
++        {
+             printf("banner1: test failed\n");
+             return 1;
+         }
+@@ -530,52 +522,55 @@ banner1_selftest()
+     memset(tcb_state, 0, sizeof(tcb_state[0]));
+ 
+     banner1_parse(
+-                    b,
+-                    tcb_state,
+-                    px, length,
+-                    banout,
+-                    0);
++        b,
++        tcb_state,
++        px, length,
++        banout,
++        0);
+     banner1_destroy(b);
+     /*if (memcmp(banner, "Via:HTTP/1.1", 11) != 0) {
+         printf("banner1: test failed\n");
+         return 1;
+     }*/
+ 
+-
+     {
+         int x = 0;
+ 
+         x = banner_ssl.selftest();
+-        if (x) {
++        if (x)
++        {
+             fprintf(stderr, "SSL banner: selftest failed\n");
+             return 1;
+         }
+-        
++
+         x = banner_smb1.selftest();
+-        if (x) {
++        if (x)
++        {
+             fprintf(stderr, "SMB banner: selftest failed\n");
+             return 1;
+         }
+-        
++
+         x = banner_http.selftest();
+-        if (x) {
++        if (x)
++        {
+             fprintf(stderr, "HTTP banner: selftest failed\n");
+             return 1;
+         }
+-        
++
+         x = banner_telnet.selftest();
+-        if (x) {
++        if (x)
++        {
+             fprintf(stderr, "Telnet banner: selftest failed\n");
+             return 1;
+         }
+-        
++
+         x = banner_rdp.selftest();
+-        if (x) {
++        if (x)
++        {
+             fprintf(stderr, "RDP banner: selftest failed\n");
+             return 1;
+         }
+-        
++
+         return x;
+     }
+ }
+-
+diff --git a/src/proto-banner1.h b/src/proto-banner1.h
+index 360262b..ca8284a 100644
+--- a/src/proto-banner1.h
++++ b/src/proto-banner1.h
+@@ -13,12 +13,12 @@ struct Banner1;
+ struct ProtocolState;
+ 
+ typedef void (*BannerParser)(
+-              const struct Banner1 *banner1,
+-              void *banner1_private,
+-              struct ProtocolState *stream_state,
+-              const unsigned char *px, size_t length,
+-              struct BannerOutput *banout,
+-              struct InteractiveData *more);
++    const struct Banner1 *banner1,
++    void *banner1_private,
++    struct ProtocolState *stream_state,
++    const unsigned char *px, size_t length,
++    struct BannerOutput *banout,
++    struct InteractiveData *more);
+ struct Banner1
+ {
+     struct lua_State *L;
+@@ -28,29 +28,31 @@ struct Banner1
+     struct SMACK *memcached_responses;
+     struct SMACK *memcached_stats;
+ 
+-    unsigned is_capture_html:1;
+-    unsigned is_capture_cert:1;
+-    unsigned is_capture_servername:1;
+-    unsigned is_capture_heartbleed:1;
+-    unsigned is_capture_ticketbleed:1;
+-    unsigned is_heartbleed:1;
+-    unsigned is_ticketbleed:1;
+-    unsigned is_poodle_sslv3:1;
+-
+-    struct {
++    unsigned is_capture_html : 1;
++    unsigned is_capture_cert : 1;
++    unsigned is_capture_servername : 1;
++    unsigned is_capture_heartbleed : 1;
++    unsigned is_capture_ticketbleed : 1;
++    unsigned is_heartbleed : 1;
++    unsigned is_ticketbleed : 1;
++    unsigned is_poodle_sslv3 : 1;
++
++    struct
++    {
+         struct ProtocolParserStream *tcp[65536];
+     } payloads;
+-    
++
+     BannerParser parser[PROTO_end_of_list];
+ };
+ 
+ struct BannerBase64
+ {
+-    unsigned state:2;
+-    unsigned temp:24;
++    unsigned state : 2;
++    unsigned temp : 24;
+ };
+ 
+-struct SSL_SERVER_HELLO {
++struct SSL_SERVER_HELLO
++{
+     unsigned state;
+     unsigned remaining;
+     unsigned timestamp;
+@@ -61,32 +63,39 @@ struct SSL_SERVER_HELLO {
+     unsigned char version_major;
+     unsigned char version_minor;
+ };
+-struct SSL_SERVER_CERT {
++struct SSL_SERVER_CERT
++{
+     unsigned state;
+     unsigned remaining;
+-    struct {
++    struct
++    {
+         unsigned remaining;
+     } sub;
+     struct CertDecode x509;
+ };
+-struct SSL_SERVER_ALERT {
++struct SSL_SERVER_ALERT
++{
+     unsigned char level;
+     unsigned char description;
+ };
+ 
+-struct SSLRECORD {
++struct SSLRECORD
++{
+     unsigned char type;
+     unsigned char version_major;
+     unsigned char version_minor;
+ 
+-    struct {
++    struct
++    {
+         unsigned state;
+         unsigned char type;
+         unsigned remaining;
+     } handshake;
+ 
+-    union {
+-        struct {
++    union
++    {
++        struct
++        {
+             /* all these structs should start with state */
+             unsigned state;
+         } all;
+@@ -94,10 +103,10 @@ struct SSLRECORD {
+         struct SSL_SERVER_CERT server_cert;
+         struct SSL_SERVER_ALERT server_alert;
+     } x;
+-
+ };
+ 
+-struct PIXEL_FORMAT {
++struct PIXEL_FORMAT
++{
+     unsigned short red_max;
+     unsigned short green_max;
+     unsigned short blue_max;
+@@ -106,92 +115,102 @@ struct PIXEL_FORMAT {
+     unsigned char blue_shift;
+     unsigned char bits_per_pixel;
+     unsigned char depth;
+-    unsigned big_endian_flag:1;
+-    unsigned true_colour_flag:1;
++    unsigned big_endian_flag : 1;
++    unsigned true_colour_flag : 1;
+ };
+-struct VNCSTUFF {
++struct VNCSTUFF
++{
+     unsigned sectype;
+     unsigned char version;
+     unsigned char len;
+-    
++
+     unsigned short width;
+     unsigned short height;
+-    
+-    struct PIXEL_FORMAT pixel;    
++
++    struct PIXEL_FORMAT pixel;
+ };
+ 
+-struct FTPSTUFF {
++struct FTPSTUFF
++{
+     unsigned code;
+-    unsigned is_last:1;
++    unsigned is_last : 1;
+ };
+ 
+-
+-struct SMTPSTUFF {
++struct SMTPSTUFF
++{
+     unsigned code;
+-    unsigned is_last:1;
++    unsigned is_last : 1;
+ };
+ 
+-struct POP3STUFF {
++struct POP3STUFF
++{
+     unsigned code;
+-    unsigned is_last:1;
++    unsigned is_last : 1;
+ };
+ 
+-struct MEMCACHEDSTUFF {
++struct MEMCACHEDSTUFF
++{
+     unsigned match;
+ };
+ 
+-struct Smb72_Negotiate {
++struct Smb72_Negotiate
++{
+     uint16_t DialectIndex;
+     uint16_t SecurityMode;
+     uint64_t SystemTime;
+     uint32_t SessionKey;
+     uint32_t Capabilities;
+     uint16_t ServerTimeZone;
+-    uint8_t  ChallengeLength;
+-    uint8_t  ChallengeOffset;
++    uint8_t ChallengeLength;
++    uint8_t ChallengeOffset;
+ };
+ 
+-struct Smb73_Setup {
++struct Smb73_Setup
++{
+     uint16_t BlobLength;
+     uint16_t BlobOffset;
+ };
+ 
+-struct SMBSTUFF {
++struct SMBSTUFF
++{
+     unsigned nbt_state;
+     unsigned char nbt_type;
+     unsigned char nbt_flags;
+-    unsigned is_printed_ver:1;
+-    unsigned is_printed_guid:1;
+-    unsigned is_printed_time:1;
++    unsigned is_printed_ver : 1;
++    unsigned is_printed_guid : 1;
++    unsigned is_printed_time : 1;
+     unsigned nbt_length;
+     unsigned nbt_err;
+-    
+-    union {
+-        struct {
+-            unsigned char   command;
+-            unsigned        status;
+-            unsigned char   flags1;
+-            unsigned short  flags2;
+-            unsigned        pid;
+-            unsigned char   signature[8];
+-            unsigned short  tid;
+-            unsigned short  uid;
+-            unsigned short  mid;
+-            unsigned short  param_length;
+-            unsigned short  param_offset;
+-            unsigned short  byte_count;
+-            unsigned short  byte_offset;
+-            unsigned short  byte_state;
+-            unsigned short  unicode_char;
++
++    union
++    {
++        struct
++        {
++            unsigned char command;
++            unsigned status;
++            unsigned char flags1;
++            unsigned short flags2;
++            unsigned pid;
++            unsigned char signature[8];
++            unsigned short tid;
++            unsigned short uid;
++            unsigned short mid;
++            unsigned short param_length;
++            unsigned short param_offset;
++            unsigned short byte_count;
++            unsigned short byte_offset;
++            unsigned short byte_state;
++            unsigned short unicode_char;
+         } smb1;
+-        struct {
++        struct
++        {
+             unsigned seqno;
+             unsigned short header_length;
+             unsigned short offset;
+             unsigned short state;
+             unsigned short opcode;
+             unsigned short struct_length;
+-            unsigned is_dynamic:1;
++            unsigned is_dynamic : 1;
+             unsigned char flags;
+             unsigned ntstatus;
+             unsigned number;
+@@ -199,10 +218,12 @@ struct SMBSTUFF {
+             unsigned short blob_length;
+         } smb2;
+     } hdr;
+-    union {
++    union
++    {
+         struct Smb72_Negotiate negotiate;
+         struct Smb73_Setup setup;
+-        struct {
++        struct
++        {
+             uint64_t current_time;
+             uint64_t boot_time;
+         } negotiate2;
+@@ -210,9 +231,11 @@ struct SMBSTUFF {
+     struct SpnegoDecode spnego;
+ };
+ 
+-struct RDPSTUFF {
++struct RDPSTUFF
++{
+     unsigned short tpkt_length;
+-    struct {
++    struct
++    {
+         unsigned state;
+         unsigned short dstref;
+         unsigned short srcref;
+@@ -220,7 +243,8 @@ struct RDPSTUFF {
+         unsigned char type;
+         unsigned char flags;
+     } cotp;
+-    struct {
++    struct
++    {
+         unsigned state;
+         unsigned result;
+         unsigned char type;
+@@ -229,15 +253,17 @@ struct RDPSTUFF {
+     } cc;
+ };
+ 
+-struct ProtocolState {
++struct ProtocolState
++{
+     unsigned state;
+     unsigned remaining;
+     unsigned short port;
+     unsigned short app_proto;
+-    unsigned is_sent_sslhello:1;
++    unsigned is_sent_sslhello : 1;
+     struct BannerBase64 base64;
+ 
+-    union {
++    union
++    {
+         struct SSLRECORD ssl;
+         struct VNCSTUFF vnc;
+         struct FTPSTUFF ftp;
+@@ -249,7 +275,8 @@ struct ProtocolState {
+     } sub;
+ };
+ 
+-enum {
++enum
++{
+     CTRL_SMALL_WINDOW = 1,
+ };
+ 
+@@ -257,7 +284,8 @@ enum {
+  * A registration structure for various TCP stream protocols
+  * like HTTP, SSL, and SSH
+  */
+-struct ProtocolParserStream {
++struct ProtocolParserStream
++{
+     const char *name;
+     unsigned port;
+     const void *hello;
+@@ -274,41 +302,41 @@ struct ProtocolParserStream {
+         struct InteractiveData *more);
+     void (*cleanup)(struct ProtocolState *stream_state);
+     void (*transmit_hello)(const struct Banner1 *banner1, struct InteractiveData *more);
+-    
++
+     /* When multiple items are registered for a port. When one
+      * connection is closed, the next will be opened.*/
+     struct ProtocolParserStream *next;
+-    
++
+     /*NOTE: the 'next' parameter should be the last one in this structure,
+      * because we statically initialize the rest of the members at compile
+      * time, and then use this last parameter to link up structures
+      * at runtime */
+ };
+ 
+-
+ /**
+  * Patterns that match the data from the start of a TCP connection.
+  * This will hint at what protocol that connection might be.
+  */
+-struct Patterns {
+-    
++struct Patterns
++{
++
+     /** A string like "SSH-" or "220 " that matches a banner */
+     const char *pattern;
+-    
++
+     /** The length of that string, since it may be binary containing
+      * nul characters */
+     unsigned pattern_length;
+-    
++
+     /** An integer arbitrarily assigned to this pattern, which should
+      * probably match the protocol ID that we are looking for */
+     unsigned id;
+-    
++
+     /**
+      * Whether this string matches only at the beginning ('anchored')
+      * or anywhere in the input. Virtually all the patterns are anchored.
+      */
+     unsigned is_anchored;
+-    
++
+     /**
+      * Some extra flags for the pattern matcher for a few of the patterns.
+      */
+@@ -318,19 +346,15 @@ struct Patterns {
+ struct Banner1 *
+ banner1_create(void);
+ 
+-
+-void
+-banner1_destroy(struct Banner1 *b);
++void banner1_destroy(struct Banner1 *b);
+ 
+ unsigned
+ banner1_parse(
+-        const struct Banner1 *banner1,
+-        struct ProtocolState *pstate,
+-        const unsigned char *px, size_t length,
+-        struct BannerOutput *banout,
+-        struct InteractiveData *more);
+-
+-
++    const struct Banner1 *banner1,
++    struct ProtocolState *pstate,
++    const unsigned char *px, size_t length,
++    struct BannerOutput *banout,
++    struct InteractiveData *more);
+ 
+ /**
+  * Test the banner protocol-parsing system by reading
+diff --git a/src/proto-tcp.c b/src/proto-tcp.c
+index a17030d..3c7a1d4 100644
+--- a/src/proto-tcp.c
++++ b/src/proto-tcp.c
+@@ -11,7 +11,7 @@
+ #include <time.h>
+ #include <stddef.h>
+ #include "syn-cookie.h"
+-#include "event-timeout.h"      /* for tracking future events */
++#include "event-timeout.h" /* for tracking future events */
+ #include "rawsock.h"
+ #include "logger.h"
+ #include "templ-pkt.h"
+@@ -30,8 +30,6 @@
+ #include "scripting.h"
+ #include "versioning.h"
+ 
+-
+-
+ /***************************************************************************
+  * A "TCP control block" is what most operating-systems/network-stack
+  * calls the structure that corresponds to a TCP connection. It contains
+@@ -46,27 +44,27 @@ struct TCP_Control_Block
+     unsigned short port_me;
+     unsigned short port_them;
+ 
+-    uint32_t seqno_me;      /* next seqno I will use for transmit */
+-    uint32_t seqno_them;    /* the next seqno I expect to receive */
++    uint32_t seqno_me;   /* next seqno I will use for transmit */
++    uint32_t seqno_them; /* the next seqno I expect to receive */
+     uint32_t ackno_me;
+     uint32_t ackno_them;
+     uint32_t seqno_them_first; /* ipv6-todo */
+-    
++
+     struct TCP_Control_Block *next;
+     struct TimeoutEntry timeout[1];
+ 
+     unsigned char ttl;
+-    unsigned tcpstate:4;
+-    unsigned is_ipv6:1;
++    unsigned tcpstate : 4;
++    unsigned is_ipv6 : 1;
+ 
+     /** Set to true when the TCB is in-use/allocated, set to zero
+      * when it's about to be deleted soon */
+-    unsigned is_active:1;
+-    
++    unsigned is_active : 1;
++
+     /* If the payload we've sent was dynamically allocated with
+      * malloc() from the heap, in which case we'll have to free()
+      * it. (Most payloads are static memory) */
+-    unsigned is_payload_dynamic:1;
++    unsigned is_payload_dynamic : 1;
+ 
+     unsigned established;
+ 
+@@ -78,7 +76,7 @@ struct TCP_Control_Block
+      * If Running a script, the thread object
+      */
+     struct ScriptingThread *scripting_thread;
+-    
++
+     struct BannerOutput banout;
+ 
+     struct ProtocolState banner1_state;
+@@ -86,7 +84,8 @@ struct TCP_Control_Block
+     unsigned packet_number;
+ };
+ 
+-struct TCP_ConnectionTable {
++struct TCP_ConnectionTable
++{
+     struct TCP_Control_Block **entries;
+     struct TCP_Control_Block *freed_list;
+     unsigned count;
+@@ -104,11 +103,12 @@ struct TCP_ConnectionTable {
+     struct Banner1 *banner1;
+     OUTPUT_REPORT_BANNER report_banner;
+     struct Output *out;
+-    
++
+     struct ScriptingVM *scripting_vm;
+ };
+ 
+-enum {
++enum
++{
+     STATE_SYN_SENT,
+     //STATE_SYN_RECEIVED,
+     STATE_ESTABLISHED_SEND, /* our own special state, can only send */
+@@ -121,17 +121,15 @@ enum {
+     STATE_TIME_WAIT,
+ };
+ 
+-
+-
+ /***************************************************************************
+  * Process all events, up to the current time, that need timing out.
+  ***************************************************************************/
+-void
+-tcpcon_timeouts(struct TCP_ConnectionTable *tcpcon, unsigned secs, unsigned usecs)
++void tcpcon_timeouts(struct TCP_ConnectionTable *tcpcon, unsigned secs, unsigned usecs)
+ {
+     uint64_t timestamp = TICKS_FROM_TV(secs, usecs);
+ 
+-    for (;;) {
++    for (;;)
++    {
+         struct TCP_Control_Block *tcb;
+ 
+         /*
+@@ -166,11 +164,12 @@ tcpcon_timeouts(struct TCP_ConnectionTable *tcpcon, unsigned secs, unsigned usec
+          * so I put some code here as a catch-all: if the TCB hasn't been
+          * deleted, but hasn't been inserted back into the timeout system,
+          * then insert it here. */
+-        if (tcb->timeout->prev == 0 && tcb->is_active) {
+-            timeouts_add(   tcpcon->timeouts,
+-                            tcb->timeout,
+-                            offsetof(struct TCP_Control_Block, timeout),
+-                            TICKS_FROM_TV(secs+2, usecs));
++        if (tcb->timeout->prev == 0 && tcb->is_active)
++        {
++            timeouts_add(tcpcon->timeouts,
++                         tcb->timeout,
++                         offsetof(struct TCP_Control_Block, timeout),
++                         TICKS_FROM_TV(secs + 2, usecs));
+         }
+     }
+ }
+@@ -180,7 +179,8 @@ tcpcon_timeouts(struct TCP_ConnectionTable *tcpcon, unsigned secs, unsigned usec
+ static int
+ name_equals(const char *lhs, const char *rhs)
+ {
+-    for (;;) {
++    for (;;)
++    {
+         while (*lhs == '-' || *lhs == '.' || *lhs == '_')
+             lhs++;
+         while (*rhs == '-' || *rhs == '.' || *rhs == '_')
+@@ -209,7 +209,8 @@ parseInt(const void *vstr, size_t length)
+     uint64_t result = 0;
+     size_t i;
+ 
+-    for (i=0; i<length; i++) {
++    for (i = 0; i < length; i++)
++    {
+         result = result * 10 + (str[i] - '0');
+     }
+     return result;
+@@ -219,53 +220,52 @@ parseInt(const void *vstr, size_t length)
+  * Called at startup, when processing command-line options, to set
+  * an HTTP field.
+  ***************************************************************************/
+-void
+-tcpcon_set_http_header(struct TCP_ConnectionTable *tcpcon,
+-                        const char *name,
+-                        size_t value_length,
+-                        const void *value,
+-                        enum http_field_t what)
++void tcpcon_set_http_header(struct TCP_ConnectionTable *tcpcon,
++                            const char *name,
++                            size_t value_length,
++                            const void *value,
++                            enum http_field_t what)
+ {
+     UNUSEDPARM(tcpcon);
+     banner_http.hello_length = http_change_field(
+-                            (unsigned char**)&banner_http.hello,
+-                            banner_http.hello_length,
+-                            name,
+-                            (const unsigned char *)value,
+-                            value_length,
+-                            what);
++        (unsigned char **)&banner_http.hello,
++        banner_http.hello_length,
++        name,
++        (const unsigned char *)value,
++        value_length,
++        what);
+ }
+ 
+ /***************************************************************************
+  * Called at startup, when processing command-line options, to set
+  * parameters specific to TCP processing.
+  ***************************************************************************/
+-void
+-tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+-                        const char *name,
+-                        size_t value_length,
+-                        const void *value)
++void tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
++                          const char *name,
++                          size_t value_length,
++                          const void *value)
+ {
+     struct Banner1 *banner1 = tcpcon->banner1;
+ 
+-    if (name_equals(name, "http-payload")) {
++    if (name_equals(name, "http-payload"))
++    {
+         char lenstr[64];
+         sprintf_s(lenstr, sizeof(lenstr), "%u", (unsigned)value_length);
+ 
+         banner_http.hello_length = http_change_requestline(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                3); /* payload*/
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            (const unsigned char *)value,
++            value_length,
++            3); /* payload*/
+ 
+         banner_http.hello_length = http_change_field(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                "Content-Length:",
+-                                (const unsigned char *)lenstr,
+-                                strlen(lenstr),
+-                                http_field_replace);
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            "Content-Length:",
++            (const unsigned char *)lenstr,
++            strlen(lenstr),
++            http_field_replace);
+         return;
+     }
+ 
+@@ -275,65 +275,72 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+      * you on the open Internet -- I would never use the default user-agent
+      * string built into masscan
+      */
+-    if (name_equals(name, "http-user-agent")) {
++    if (name_equals(name, "http-user-agent"))
++    {
+         banner_http.hello_length = http_change_field(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                "User-Agent:",
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                http_field_replace);
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            "User-Agent:",
++            (const unsigned char *)value,
++            value_length,
++            http_field_replace);
+         return;
+     }
+-    if (name_equals(name, "http-host")) {
++    if (name_equals(name, "http-host"))
++    {
+         banner_http.hello_length = http_change_field(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                "Host:",
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                http_field_replace);
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            "Host:",
++            (const unsigned char *)value,
++            value_length,
++            http_field_replace);
+         return;
+     }
+ 
+     /**
+      * Changes the URL
+      */
+-    if (name_equals(name, "http-method")) {
++    if (name_equals(name, "http-method"))
++    {
+         banner_http.hello_length = http_change_requestline(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                0); /* method*/
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            (const unsigned char *)value,
++            value_length,
++            0); /* method*/
+         return;
+     }
+-    if (name_equals(name, "http-url")) {
++    if (name_equals(name, "http-url"))
++    {
+         banner_http.hello_length = http_change_requestline(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                1); /* url */
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            (const unsigned char *)value,
++            value_length,
++            1); /* url */
+         return;
+     }
+-    if (name_equals(name, "http-version")) {
++    if (name_equals(name, "http-version"))
++    {
+         banner_http.hello_length = http_change_requestline(
+-                                (unsigned char**)&banner_http.hello,
+-                                banner_http.hello_length,
+-                                (const unsigned char *)value,
+-                                value_length,
+-                                2); /* version */
++            (unsigned char **)&banner_http.hello,
++            banner_http.hello_length,
++            (const unsigned char *)value,
++            value_length,
++            2); /* version */
+         return;
+     }
+ 
+-    if (name_equals(name, "timeout") || name_equals(name, "connection-timeout")) {
++    if (name_equals(name, "timeout") || name_equals(name, "connection-timeout"))
++    {
+         uint64_t n = parseInt(value, value_length);
+         tcpcon->timeout_connection = (unsigned)n;
+         LOG(1, "TCP connection-timeout = %u\n", tcpcon->timeout_connection);
+         return;
+     }
+-    if (name_equals(name, "hello-timeout")) {
++    if (name_equals(name, "hello-timeout"))
++    {
+         uint64_t n = parseInt(value, value_length);
+         tcpcon->timeout_hello = (unsigned)n;
+         LOG(1, "TCP hello-timeout = \"%.*s\"\n", (int)value_length, (const char *)value);
+@@ -344,43 +351,49 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+     /*
+      * Force SSL processing on all ports
+      */
+-    if (name_equals(name, "hello") && name_equals(value, "ssl")) {
++    if (name_equals(name, "hello") && name_equals(value, "ssl"))
++    {
+         unsigned i;
+-        
++
+         LOG(2, "HELLO: setting SSL hello message\n");
+-        for (i=0; i<65535; i++) {
++        for (i = 0; i < 65535; i++)
++        {
+             banner1->payloads.tcp[i] = &banner_ssl;
+         }
+-        
++
+         return;
+     }
+-    
++
+     /*
+      * Force HTTP processing on all ports
+      */
+-    if (name_equals(name, "hello") && name_equals(value, "http")) {
++    if (name_equals(name, "hello") && name_equals(value, "http"))
++    {
+         unsigned i;
+-        
++
+         LOG(2, "HELLO: setting HTTP hello message\n");
+-        for (i=0; i<65535; i++) {
++        for (i = 0; i < 65535; i++)
++        {
+             banner1->payloads.tcp[i] = &banner_http;
+         }
+-        
++
+         return;
+     }
+-    
++
+     /*
+      * Downgrade SMB hello from v1/v2 to use only v1
+      */
+-    if (name_equals(name, "hello") && name_equals(value, "smbv1")) {
+-        smb_set_hello_v1(&banner_smb1);        
++    if (name_equals(name, "hello") && name_equals(value, "smbv1"))
++    {
++        smb_set_hello_v1(&banner_smb1);
+         return;
+     }
+ 
+     /*
+      * 2014-04-08: scan for Neel Mehta's "heartbleed" bug
+      */
+-    if (name_equals(name, "heartbleed")) {
++    if (name_equals(name, "heartbleed"))
++    {
+         unsigned i;
+ 
+         /* Change the hello message to including negotiating the use of 
+@@ -389,14 +402,16 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+         banner_ssl.hello_length = ssl_hello_size(banner_ssl.hello);
+         tcpcon->banner1->is_heartbleed = 1;
+ 
+-        for (i=0; i<65535; i++) {
++        for (i = 0; i < 65535; i++)
++        {
+             banner1->payloads.tcp[i] = &banner_ssl;
+         }
+ 
+         return;
+     }
+ 
+-    if (name_equals(name, "ticketbleed")) {
++    if (name_equals(name, "ticketbleed"))
++    {
+         unsigned i;
+ 
+         /* Change the hello message to including negotiating the use of 
+@@ -405,7 +420,8 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+         banner_ssl.hello_length = ssl_hello_size(banner_ssl.hello);
+         tcpcon->banner1->is_ticketbleed = 1;
+ 
+-        for (i=0; i<65535; i++) {
++        for (i = 0; i < 65535; i++)
++        {
+             banner1->payloads.tcp[i] = &banner_ssl;
+         }
+ 
+@@ -415,10 +431,11 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+     /*
+      * 2014-10-16: scan for SSLv3 servers (POODLE)
+      */
+-    if (name_equals(name, "poodle") || name_equals(name, "sslv3")) {
++    if (name_equals(name, "poodle") || name_equals(name, "sslv3"))
++    {
+         unsigned i;
+         void *px;
+-        
++
+         /* Change the hello message to including negotiating the use of 
+          * the "heartbeat" extension */
+         px = ssl_hello(ssl_hello_sslv3_template);
+@@ -426,54 +443,53 @@ tcpcon_set_parameter(struct TCP_ConnectionTable *tcpcon,
+         banner_ssl.hello_length = ssl_hello_size(banner_ssl.hello);
+         tcpcon->banner1->is_poodle_sslv3 = 1;
+ 
+-        for (i=0; i<65535; i++) {
++        for (i = 0; i < 65535; i++)
++        {
+             banner1->payloads.tcp[i] = &banner_ssl;
+         }
+-        
++
+         return;
+     }
+ 
+-    
+     /*
+      * You can reconfigure the "hello" message to be anything
+      * you want.
+      */
+-    if (name_equals(name, "hello-string")) {
++    if (name_equals(name, "hello-string"))
++    {
+         struct ProtocolParserStream *x;
+         const char *p = strchr(name, '[');
+         unsigned port;
+ 
+-
+-        if (p == NULL) {
++        if (p == NULL)
++        {
+             LOG(0, "tcpcon: parameter: expected array []: %s\n", name);
+             exit(1);
+         }
+-        port = (unsigned)strtoul(p+1, 0, 0);
++        port = (unsigned)strtoul(p + 1, 0, 0);
+ 
+         x = banner1->payloads.tcp[port];
+-        if (x == NULL) {
++        if (x == NULL)
++        {
+             x = CALLOC(1, sizeof(*x));
+             x->name = "(allocated)";
+         }
+ 
+         x->hello = MALLOC(value_length);
+-        x->hello_length = base64_decode((char*)x->hello, value_length, value, value_length);
++        x->hello_length = base64_decode((char *)x->hello, value_length, value, value_length);
+ 
+         banner1->payloads.tcp[port] = x;
+     }
+-
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+-void
+-tcpcon_set_banner_flags(struct TCP_ConnectionTable *tcpcon,
+-    unsigned is_capture_cert,
+-    unsigned is_capture_servername,
+-    unsigned is_capture_html,
+-    unsigned is_capture_heartbleed,
+-	unsigned is_capture_ticketbleed)
++void tcpcon_set_banner_flags(struct TCP_ConnectionTable *tcpcon,
++                             unsigned is_capture_cert,
++                             unsigned is_capture_servername,
++                             unsigned is_capture_html,
++                             unsigned is_capture_heartbleed,
++                             unsigned is_capture_ticketbleed)
+ {
+     tcpcon->banner1->is_capture_cert = is_capture_cert;
+     tcpcon->banner1->is_capture_servername = is_capture_servername;
+@@ -487,7 +503,7 @@ tcpcon_set_banner_flags(struct TCP_ConnectionTable *tcpcon,
+ void scripting_init_tcp(struct TCP_ConnectionTable *tcpcon, struct lua_State *L)
+ {
+     tcpcon->banner1->L = L;
+-    
++
+     banner_scripting.init(tcpcon->banner1);
+ }
+ 
+@@ -496,18 +512,16 @@ void scripting_init_tcp(struct TCP_ConnectionTable *tcpcon, struct lua_State *L)
+  * table.
+  ***************************************************************************/
+ struct TCP_ConnectionTable *
+-tcpcon_create_table(    size_t entry_count,
+-                        struct stack_t *stack,
+-                        struct TemplatePacket *pkt_template,
+-                        OUTPUT_REPORT_BANNER report_banner,
+-                        struct Output *out,
+-                        unsigned connection_timeout,
+-                        uint64_t entropy
+-                        )
++tcpcon_create_table(size_t entry_count,
++                    struct stack_t *stack,
++                    struct TemplatePacket *pkt_template,
++                    OUTPUT_REPORT_BANNER report_banner,
++                    struct Output *out,
++                    unsigned connection_timeout,
++                    uint64_t entropy)
+ {
+     struct TCP_ConnectionTable *tcpcon;
+-    
+-    
++
+     tcpcon = CALLOC(1, sizeof(*tcpcon));
+     tcpcon->timeout_connection = connection_timeout;
+     if (tcpcon->timeout_connection == 0)
+@@ -520,43 +534,44 @@ tcpcon_create_table(    size_t entry_count,
+     {
+         size_t new_entry_count;
+         new_entry_count = 1;
+-        while (new_entry_count < entry_count) {
++        while (new_entry_count < entry_count)
++        {
+             new_entry_count *= 2;
+-            if (new_entry_count == 0) {
+-                new_entry_count = (1<<24);
++            if (new_entry_count == 0)
++            {
++                new_entry_count = (1 << 24);
+                 break;
+             }
+         }
+-        if (new_entry_count > (1<<24))
+-            new_entry_count = (1<<24);
+-        if (new_entry_count < (1<<10))
+-            new_entry_count = (1<<10);
++        if (new_entry_count > (1 << 24))
++            new_entry_count = (1 << 24);
++        if (new_entry_count < (1 << 10))
++            new_entry_count = (1 << 10);
+         entry_count = new_entry_count;
+     }
+ 
+     /* Create the table. If we can't allocate enough memory, then shrink
+      * the desired size of the table */
+-    while (tcpcon->entries == 0) {
++    while (tcpcon->entries == 0)
++    {
+         tcpcon->entries = malloc(entry_count * sizeof(*tcpcon->entries));
+-        if (tcpcon->entries == NULL) {
++        if (tcpcon->entries == NULL)
++        {
+             entry_count >>= 1;
+         }
+     }
+     memset(tcpcon->entries, 0, entry_count * sizeof(*tcpcon->entries));
+ 
+-
+     /* fill in the table structure */
+     tcpcon->count = (unsigned)entry_count;
+-    tcpcon->mask = (unsigned)(entry_count-1);
++    tcpcon->mask = (unsigned)(entry_count - 1);
+ 
+     /* create an event/timeouts structure */
+     tcpcon->timeouts = timeouts_create(TICKS_FROM_SECS(time(0)));
+ 
+-
+     tcpcon->pkt_template = pkt_template;
+ 
+     tcpcon->stack = stack;
+-    
+ 
+     tcpcon->banner1 = banner1_create();
+ 
+@@ -571,12 +586,15 @@ static int EQUALS(const struct TCP_Control_Block *lhs, const struct TCP_Control_
+         return 0;
+     if (lhs->ip_me.version != rhs->ip_me.version)
+         return 0;
+-    if (lhs->ip_me.version == 6) {
++    if (lhs->ip_me.version == 6)
++    {
+         if (memcmp(&lhs->ip_me.ipv6, &rhs->ip_me.ipv6, sizeof(rhs->ip_me.ipv6)) != 0)
+             return 0;
+         if (memcmp(&lhs->ip_them.ipv6, &rhs->ip_them.ipv6, sizeof(rhs->ip_them.ipv6)) != 0)
+             return 0;
+-    } else {
++    }
++    else
++    {
+         if (lhs->ip_me.ipv4 != rhs->ip_me.ipv4)
+             return 0;
+         if (lhs->ip_them.ipv4 != rhs->ip_them.ipv4)
+@@ -589,37 +607,39 @@ static int EQUALS(const struct TCP_Control_Block *lhs, const struct TCP_Control_
+ /***************************************************************************
+  ***************************************************************************/
+ static unsigned
+-tcb_hash(   ipaddress ip_me, unsigned port_me, 
+-            ipaddress ip_them, unsigned port_them,
+-            uint64_t entropy)
++tcb_hash(ipaddress ip_me, unsigned port_me,
++         ipaddress ip_them, unsigned port_them,
++         uint64_t entropy)
+ {
+     unsigned index;
+ 
+     /* TCB hash table uses symmetric hash, so incoming/outgoing packets
+      * get the same hash. */
+-    if (ip_me.version == 6) {
++    if (ip_me.version == 6)
++    {
+         ipv6address ipv6 = ip_me.ipv6;
+         ipv6.hi ^= ip_them.ipv6.hi;
+         ipv6.lo ^= ip_them.ipv6.lo;
+         index = (unsigned)syn_cookie_ipv6(
+-                                    ipv6, 
+-                                    port_me ^ port_them,
+-                                    ipv6, 
+-                                    port_me ^ port_them,
+-                                    entropy);
+-
+-    } else {
+-        index = (unsigned)syn_cookie_ipv4(   ip_me.ipv4   ^ ip_them.ipv4,
+-                                        port_me ^ port_them,
+-                                        ip_me.ipv4   ^ ip_them.ipv4,
+-                                        port_me ^ port_them,
+-                                        entropy
+-                                        );
++            ipv6,
++            port_me ^ port_them,
++            ipv6,
++            port_me ^ port_them,
++            entropy);
++    }
++    else
++    {
++        index = (unsigned)syn_cookie_ipv4(ip_me.ipv4 ^ ip_them.ipv4,
++                                          port_me ^ port_them,
++                                          ip_me.ipv4 ^ ip_them.ipv4,
++                                          port_me ^ port_them,
++                                          entropy);
+     }
+     return index;
+ }
+ 
+-enum DestroyReason {
++enum DestroyReason
++{
+     Reason_Timeout = 1,
+     Reason_FIN = 2,
+     Reason_RST = 3,
+@@ -638,31 +658,32 @@ static void
+ tcpcon_flush_banners(struct TCP_ConnectionTable *tcpcon, struct TCP_Control_Block *tcb)
+ {
+     struct BannerOutput *banout;
+-    
++
+     /* Go through and print all the banners. Some protocols have 
+      * multiple banners. For example, web servers have both
+      * HTTP and HTML banners, and SSL also has several 
+      * X.509 certificate banners */
+-    for (banout = &tcb->banout; banout != NULL; banout = banout->next) {
+-        if (banout->length && banout->protocol) {
++    for (banout = &tcb->banout; banout != NULL; banout = banout->next)
++    {
++        if (banout->length && banout->protocol)
++        {
+             tcpcon->report_banner(
+-                                  tcpcon->out,
+-                                  global_now,
+-                                  tcb->ip_them,
+-                                  6, /*TCP protocol*/
+-                                  tcb->port_them,
+-                                  banout->protocol & 0x0FFFFFFF,
+-                                  tcb->ttl,
+-                                  banout->banner,
+-                                  banout->length);
++                tcpcon->out,
++                global_now,
++                tcb->ip_them,
++                6, /*TCP protocol*/
++                tcb->port_them,
++                banout->protocol & 0x0FFFFFFF,
++                tcb->ttl,
++                banout->banner,
++                banout->length);
+         }
+     }
+-    
++
+     /*
+      * Free up all the banners.
+      */
+     banout_release(&tcb->banout);
+-
+ }
+ 
+ /***************************************************************************
+@@ -679,7 +700,7 @@ tcpcon_destroy_tcb(
+     unsigned index;
+     struct TCP_Control_Block **r_entry;
+     ipaddress_formatted_t fmt;
+-    
++
+     UNUSEDPARM(reason);
+ 
+     fmt = ipaddress_fmt(tcb->ip_them);
+@@ -689,10 +710,10 @@ tcpcon_destroy_tcb(
+      * The TCB doesn't point to it's location in the table. Therefore, we
+      * have to do a lookup to find the head pointer in the table.
+      */
+-    index = tcb_hash(   tcb->ip_me, tcb->port_me, 
+-                        tcb->ip_them, tcb->port_them, 
+-                        tcpcon->entropy);
+-    
++    index = tcb_hash(tcb->ip_me, tcb->port_me,
++                     tcb->ip_them, tcb->port_them,
++                     tcpcon->entropy);
++
+     /*
+      * At this point, we have the head of a linked list of TCBs. Now,
+      * traverse that linked list until we find our TCB
+@@ -701,7 +722,8 @@ tcpcon_destroy_tcb(
+     while (*r_entry && *r_entry != tcb)
+         r_entry = &(*r_entry)->next;
+ 
+-    if (*r_entry == NULL) {
++    if (*r_entry == NULL)
++    {
+         LOG(1, "tcb: double free\n");
+         return;
+     }
+@@ -713,17 +735,18 @@ tcpcon_destroy_tcb(
+      */
+     tcpcon_flush_banners(tcpcon, tcb);
+     if (tcb->is_payload_dynamic && tcb->payload_length && tcb->payload)
+-        free((void*)tcb->payload);
+-    
++        free((void *)tcb->payload);
++
+     if (tcb->scripting_thread)
+         ; //scripting_thread_close(tcb->scripting_thread);
+     tcb->scripting_thread = 0;
+-    
++
+     /* KLUDGE: this needs to be made more elegant */
+-    switch (tcb->banner1_state.app_proto) {
+-        case PROTO_SMB:
+-            banner_smb1.cleanup(&tcb->banner1_state);
+-            break;
++    switch (tcb->banner1_state.app_proto)
++    {
++    case PROTO_SMB:
++        banner_smb1.cleanup(&tcb->banner1_state);
++        break;
+     }
+ 
+     /*
+@@ -738,22 +761,17 @@ tcpcon_destroy_tcb(
+ 
+     tcb->is_active = 0;
+ 
+-
+-
+-
+     (*r_entry) = tcb->next;
+     tcb->next = tcpcon->freed_list;
+     tcpcon->freed_list = tcb;
+     tcpcon->active_count--;
+ }
+ 
+-
+ /***************************************************************************
+  * Called at shutdown to free up all the memory used by the TCP
+  * connection table.
+  ***************************************************************************/
+-void
+-tcpcon_destroy_table(struct TCP_ConnectionTable *tcpcon)
++void tcpcon_destroy_table(struct TCP_ConnectionTable *tcpcon)
+ {
+     unsigned i;
+ 
+@@ -764,7 +782,8 @@ tcpcon_destroy_table(struct TCP_ConnectionTable *tcpcon)
+      * Do a graceful destruction of all the entires. If they have banners,
+      * they will be sent to the output
+      */
+-    for (i=0; i<=tcpcon->mask; i++) {
++    for (i = 0; i <= tcpcon->mask; i++)
++    {
+         while (tcpcon->entries[i])
+             tcpcon_destroy_tcb(tcpcon, tcpcon->entries[i], Reason_Shutdown);
+     }
+@@ -772,7 +791,8 @@ tcpcon_destroy_table(struct TCP_ConnectionTable *tcpcon)
+     /*
+      * Now free the memory
+      */
+-    while (tcpcon->freed_list) {
++    while (tcpcon->freed_list)
++    {
+         struct TCP_Control_Block *tcb = tcpcon->freed_list;
+         tcpcon->freed_list = tcb->next;
+         free(tcb);
+@@ -783,7 +803,6 @@ tcpcon_destroy_table(struct TCP_ConnectionTable *tcpcon)
+     free(tcpcon);
+ }
+ 
+-
+ /***************************************************************************
+  *
+  * Called when we receive a "SYN-ACK" packet with the correct SYN-cookie.
+@@ -809,17 +828,21 @@ tcpcon_create_tcb(
+     tmp.port_them = (unsigned short)port_them;
+ 
+     index = tcb_hash(ip_me, port_me, ip_them, port_them, tcpcon->entropy);
+-    
+-    
++
+     tcb = tcpcon->entries[index & tcpcon->mask];
+-    while (tcb && !EQUALS(tcb, &tmp)) {
++    while (tcb && !EQUALS(tcb, &tmp))
++    {
+         tcb = tcb->next;
+     }
+-    if (tcb == NULL) {
+-        if (tcpcon->freed_list) {
++    if (tcb == NULL)
++    {
++        if (tcpcon->freed_list)
++        {
+             tcb = tcpcon->freed_list;
+             tcpcon->freed_list = tcb->next;
+-        } else {
++        }
++        else
++        {
+             tcb = MALLOC(sizeof(*tcb));
+         }
+         memset(tcb, 0, sizeof(*tcb));
+@@ -842,12 +865,11 @@ tcpcon_create_tcb(
+ 
+         timeout_init(tcb->timeout);
+         banout_init(&tcb->banout);
+-        
++
+         /* The TCB is now allocated/in-use */
+         assert(tcb->ip_me.version != 0 && tcb->ip_them.version != 0);
+         tcb->is_active = 1;
+ 
+-
+         tcpcon->active_count++;
+     }
+ 
+@@ -856,8 +878,6 @@ tcpcon_create_tcb(
+     return tcb;
+ }
+ 
+-
+-
+ /***************************************************************************
+  ***************************************************************************/
+ struct TCP_Control_Block *
+@@ -881,7 +901,7 @@ tcb_lookup(
+ 
+     fmt1 = ipaddress_fmt(ip_me);
+     fmt2 = ipaddress_fmt(ip_them);
+-    LOG(1, "tcb_hash(0x%08x) = %s %u %s %u\n", 
++    LOG(1, "tcb_hash(0x%08x) = %s %u %s %u\n",
+         (unsigned)index,
+         fmt1.string, port_me,
+         fmt2.string, port_them);
+@@ -889,15 +909,14 @@ tcb_lookup(
+     /* Hash to an entry in the table, then follow a linked list from
+      * that point forward. */
+     tcb = tcpcon->entries[index & tcpcon->mask];
+-    while (tcb && !EQUALS(tcb, &tmp)) {
++    while (tcb && !EQUALS(tcb, &tmp))
++    {
+         tcb = tcb->next;
+     }
+ 
+-
+     return tcb;
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+ static void
+@@ -909,22 +928,23 @@ tcpcon_send_packet(
+     unsigned ctrl)
+ {
+     struct PacketBuffer *response = 0;
+-    
+-    assert(tcb->ip_me.version != 0 && tcb->ip_them.version != 0);
+ 
++    assert(tcb->ip_me.version != 0 && tcb->ip_them.version != 0);
+ 
+     /* Get a buffer for sending the response packet. This thread doesn't
+      * send the packet itself. Instead, it formats a packet, then hands
+      * that packet off to a transmit thread for later transmission. */
+     response = stack_get_packetbuffer(tcpcon->stack);
+-    if (response == NULL) {
++    if (response == NULL)
++    {
+         static int is_warning_printed = 0;
+-        if (!is_warning_printed) {
++        if (!is_warning_printed)
++        {
+             LOG(0, "packet buffers empty (should be impossible)\n");
+             is_warning_printed = 1;
+         }
+         fflush(stdout);
+-        
++
+         /* FIXME: I'm no sure the best way to handle this.
+          * This would result from a bug in the code,
+          * but I'm not sure what should be done in response */
+@@ -947,13 +967,13 @@ tcpcon_send_packet(
+         tcb->seqno_me, tcb->seqno_them,
+         tcp_flags,
+         payload, payload_length,
+-        response->px, sizeof(response->px)
+-        );
++        response->px, sizeof(response->px));
+ 
+     /*
+      * KLUDGE:
+      */
+-    if (ctrl & CTRL_SMALL_WINDOW) {
++    if (ctrl & CTRL_SMALL_WINDOW)
++    {
+         tcp_set_window(response->px, response->length, 600);
+     }
+     //tcp_set_window(response->px, response->length, 600);
+@@ -973,25 +993,24 @@ tcpcon_send_packet(
+ 
+ /***************************************************************************
+  ***************************************************************************/
+-void
+-tcp_send_RST(
++void tcp_send_RST(
+     struct TemplatePacket *templ,
+     struct stack_t *stack,
+     ipaddress ip_them, ipaddress ip_me,
+     unsigned port_them, unsigned port_me,
+-    unsigned seqno_them, unsigned seqno_me
+-)
++    unsigned seqno_them, unsigned seqno_me)
+ {
+     struct PacketBuffer *response = 0;
+-    
+ 
+     /* Get a buffer for sending the response packet. This thread doesn't
+      * send the packet itself. Instead, it formats a packet, then hands
+      * that packet off to a transmit thread for later transmission. */
+     response = stack_get_packetbuffer(stack);
+-    if (response == NULL) {
++    if (response == NULL)
++    {
+         static int is_warning_printed = 0;
+-        if (!is_warning_printed) {
++        if (!is_warning_printed)
++        {
+             LOG(0, "packet buffers empty (should be impossible)\n");
+             is_warning_printed = 1;
+         }
+@@ -1008,9 +1027,7 @@ tcp_send_RST(
+         seqno_me, seqno_them,
+         0x04, /*RST*/
+         0, 0,
+-        response->px, sizeof(response->px)
+-        );
+-
++        response->px, sizeof(response->px));
+ 
+     /* Put this buffer on the transmit queue. Remember: transmits happen
+      * from a transmit-thread only, and this function is being called
+@@ -1027,21 +1044,30 @@ static const char *
+ state_to_string(int state)
+ {
+     static char buf[64];
+-    switch (state) {
+-            //STATE_SYN_RECEIVED,
+-            //STATE_CLOSE_WATI,
+-        case STATE_LAST_ACK:        return "LAST-ACK";
+-        case STATE_FIN_WAIT1:       return "FIN-WAIT-1";
+-        case STATE_FIN_WAIT2:       return "FIN-WAIT-2";
+-        case STATE_CLOSING:         return "CLOSING";
+-        case STATE_TIME_WAIT:       return "TIME-WAIT";
+-        case STATE_SYN_SENT:        return "SYN_SENT";
+-        case STATE_ESTABLISHED_SEND:return "ESTABLISHED_SEND";
+-        case STATE_ESTABLISHED_RECV:return "ESTABLISHED_RECV";
+-            
+-        default:
+-            sprintf_s(buf, sizeof(buf), "%d", state);
+-            return buf;
++    switch (state)
++    {
++        //STATE_SYN_RECEIVED,
++        //STATE_CLOSE_WATI,
++    case STATE_LAST_ACK:
++        return "LAST-ACK";
++    case STATE_FIN_WAIT1:
++        return "FIN-WAIT-1";
++    case STATE_FIN_WAIT2:
++        return "FIN-WAIT-2";
++    case STATE_CLOSING:
++        return "CLOSING";
++    case STATE_TIME_WAIT:
++        return "TIME-WAIT";
++    case STATE_SYN_SENT:
++        return "SYN_SENT";
++    case STATE_ESTABLISHED_SEND:
++        return "ESTABLISHED_SEND";
++    case STATE_ESTABLISHED_RECV:
++        return "ESTABLISHED_RECV";
++
++    default:
++        sprintf_s(buf, sizeof(buf), "%d", state);
++        return buf;
+     }
+ }
+ 
+@@ -1053,20 +1079,26 @@ static const char *
+ what_to_string(enum TCP_What state)
+ {
+     static char buf[64];
+-    switch (state) {
+-        case TCP_WHAT_TIMEOUT: return "TIMEOUT";
+-        case TCP_WHAT_SYNACK: return "SYNACK";
+-        case TCP_WHAT_RST: return "RST";
+-        case TCP_WHAT_FIN: return "FIN";
+-        case TCP_WHAT_ACK: return "ACK";
+-        case TCP_WHAT_DATA: return "DATA";
+-        default:
+-            sprintf_s(buf, sizeof(buf), "%d", state);
+-            return buf;
++    switch (state)
++    {
++    case TCP_WHAT_TIMEOUT:
++        return "TIMEOUT";
++    case TCP_WHAT_SYNACK:
++        return "SYNACK";
++    case TCP_WHAT_RST:
++        return "RST";
++    case TCP_WHAT_FIN:
++        return "FIN";
++    case TCP_WHAT_ACK:
++        return "ACK";
++    case TCP_WHAT_DATA:
++        return "DATA";
++    default:
++        sprintf_s(buf, sizeof(buf), "%d", state);
++        return buf;
+     }
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+ 
+@@ -1080,23 +1112,21 @@ LOGSEND(struct TCP_Control_Block *tcb, const char *what)
+           what);
+ }
+ 
+-
+ /***************************************************************************
+  * Sends a fake FIN when we've already closed our connection, on the
+  * assumption this will help the other side close their side more
+  * gracefully. Maybe we should do a RST instead.
+  ***************************************************************************/
+-void
+-tcpcon_send_FIN(
+-                struct TCP_ConnectionTable *tcpcon,
+-                ipaddress ip_me, ipaddress ip_them,
+-                unsigned port_me, unsigned port_them,
+-                uint32_t seqno_them, uint32_t ackno_them)
++void tcpcon_send_FIN(
++    struct TCP_ConnectionTable *tcpcon,
++    ipaddress ip_me, ipaddress ip_them,
++    unsigned port_me, unsigned port_them,
++    uint32_t seqno_them, uint32_t ackno_them)
+ {
+     struct TCP_Control_Block tcb;
+-    
++
+     memset(&tcb, 0, sizeof(tcb));
+-    
++
+     tcb.ip_me = ip_me;
+     tcb.ip_them = ip_them;
+     tcb.port_me = (unsigned short)port_me;
+@@ -1105,22 +1135,21 @@ tcpcon_send_FIN(
+     tcb.ackno_me = seqno_them + 1;
+     tcb.seqno_them = seqno_them + 1;
+     tcb.ackno_them = ackno_them;
+-    
++
+     LOGSEND(&tcb, "peer(FIN) fake");
+     tcpcon_send_packet(tcpcon, &tcb, 0x11, 0, 0, 0);
+ }
+ 
+-void
+-tcpcon_send_RST(
+-                struct TCP_ConnectionTable *tcpcon,
+-                ipaddress ip_me, ipaddress ip_them,
+-                unsigned port_me, unsigned port_them,
+-                uint32_t seqno_them, uint32_t ackno_them)
++void tcpcon_send_RST(
++    struct TCP_ConnectionTable *tcpcon,
++    ipaddress ip_me, ipaddress ip_them,
++    unsigned port_me, unsigned port_them,
++    uint32_t seqno_them, uint32_t ackno_them)
+ {
+     struct TCP_Control_Block tcb;
+-    
++
+     memset(&tcb, 0, sizeof(tcb));
+-    
++
+     tcb.ip_me = ip_me;
+     tcb.ip_them = ip_them;
+     tcb.port_me = (unsigned short)port_me;
+@@ -1129,12 +1158,11 @@ tcpcon_send_RST(
+     tcb.ackno_me = seqno_them + 1;
+     tcb.seqno_them = seqno_them + 1;
+     tcb.ackno_them = ackno_them;
+-    
++
+     LOGSEND(&tcb, "send RST");
+     tcpcon_send_packet(tcpcon, &tcb, 0x04, 0, 0, 0);
+ }
+ 
+-
+ /***************************************************************************
+  * Parse the information we get from the server we are scanning. Typical
+  * examples are SSH banners, FTP banners, or the response from HTTP
+@@ -1149,18 +1177,17 @@ parse_banner(
+     struct InteractiveData *more)
+ {
+     assert(tcb->banout.max_length);
+-    
++
+     banner1_parse(
+-                                    tcpcon->banner1,
+-                                    &tcb->banner1_state,
+-                                    payload,
+-                                    payload_length,
+-                                    &tcb->banout,
+-                                    more);
++        tcpcon->banner1,
++        &tcb->banner1_state,
++        payload,
++        payload_length,
++        &tcb->banout,
++        more);
+     return payload_length;
+ }
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+ static int
+@@ -1176,219 +1203,235 @@ handle_ack(
+             );*/
+ 
+     /* Normal: just discard repeats */
+-    if (ackno == tcb->ackno_them) {
++    if (ackno == tcb->ackno_them)
++    {
+         return 0;
+     }
+ 
+     /* Make sure this isn't a duplicate ACK from past
+      * WRAPPING of 32-bit arithmetic happens here */
+-    if (ackno - tcb->ackno_them > 10000) {
++    if (ackno - tcb->ackno_them > 10000)
++    {
+         ipaddress_formatted_t fmt = ipaddress_fmt(tcb->ip_them);
+-        LOG(4,  "%s - "
+-                "tcb: ackno from past: "
+-                "old ackno = 0x%08x, this ackno = 0x%08x\n",
+-                fmt.string,
+-                tcb->ackno_me, ackno);
++        LOG(4, "%s - "
++               "tcb: ackno from past: "
++               "old ackno = 0x%08x, this ackno = 0x%08x\n",
++            fmt.string,
++            tcb->ackno_me, ackno);
+         return 0;
+     }
+ 
+     /* Make sure this isn't invalid ACK from the future
+      * WRAPPING of 32-bit arithmetic happens here */
+-    if (tcb->seqno_me - ackno > 10000) {
++    if (tcb->seqno_me - ackno > 10000)
++    {
+         ipaddress_formatted_t fmt = ipaddress_fmt(tcb->ip_them);
+         LOG(4, "%s - "
+-                "tcb: ackno from future: "
+-                "my seqno = 0x%08x, their ackno = 0x%08x\n",
+-                fmt.string,
+-                tcb->seqno_me, ackno);
++               "tcb: ackno from future: "
++               "my seqno = 0x%08x, their ackno = 0x%08x\n",
++            fmt.string,
++            tcb->seqno_me, ackno);
+         return 0;
+     }
+ 
+     /* now that we've verified this is a good ACK, record this number */
+     tcb->ackno_them = ackno;
+-    
++
+     /* Mark that this was a good ack */
+     return 1;
+ }
+ 
+-enum AppAction {
++enum AppAction
++{
+     APP_CONNECTED,
+     APP_RECV_TIMEOUT,
+     APP_RECV_PAYLOAD,
+     APP_SEND_SENT,
+ };
+ 
+-
+ /***************************************************************************
+  ***************************************************************************/
+ static void
+ application(struct TCP_ConnectionTable *tcpcon,
+-                 struct TCP_Control_Block *tcb,
+-                 enum AppAction action, const void *payload, size_t payload_length,
+-                 unsigned secs, unsigned usecs)
++            struct TCP_Control_Block *tcb,
++            enum AppAction action, const void *payload, size_t payload_length,
++            unsigned secs, unsigned usecs)
+ {
+     struct Banner1 *banner1 = tcpcon->banner1;
+-    
+-    enum {
++
++    enum
++    {
+         App_Connect,
+         App_ReceiveHello,
+         App_ReceiveNext,
+         App_SendNext,
+     };
+-    
+-    switch (tcb->established) {
+-        case App_Connect:
+-            if (banner1->payloads.tcp[tcb->port_them] == &banner_scripting) {
+-                //int x;
+-                ; //tcb->scripting_thread = scripting_thread_new(tcpcon->scripting_vm);
+-                ; //x = scripting_thread_run(tcb->scripting_thread);
+-            } else {
+-                /*
++
++    switch (tcb->established)
++    {
++    case App_Connect:
++        if (banner1->payloads.tcp[tcb->port_them] == &banner_scripting)
++        {
++            //int x;
++            ; //tcb->scripting_thread = scripting_thread_new(tcpcon->scripting_vm);
++            ; //x = scripting_thread_run(tcb->scripting_thread);
++        }
++        else
++        {
++            /*
+                  * Wait 1 second for "server hello" (like SSH), and if that's
+                  * not found, then transmit a "client hello"
+                  */
+-                assert(action == APP_CONNECTED);
+-                LOGSEND(tcb, "+timeout");
+-                timeouts_add( tcpcon->timeouts,
+-                             tcb->timeout,
+-                             offsetof(struct TCP_Control_Block, timeout),
+-                             TICKS_FROM_TV(secs+tcpcon->timeout_hello,usecs)
+-                             );
+-                /* Start of connection */
+-                tcb->tcpstate = STATE_ESTABLISHED_RECV;
+-                tcb->established = App_ReceiveHello;
+-            }
+-            break;
+-        case App_ReceiveHello:
+-            if (action == APP_RECV_TIMEOUT) {
+-                struct ProtocolParserStream *stream = banner1->payloads.tcp[tcb->port_them];
+-                
+-                if (stream) {
+-                    struct InteractiveData more = {0};
+-                    unsigned ctrl = 0;
+-                    
+-                    if (stream->transmit_hello)
+-                        stream->transmit_hello(banner1, &more);
+-                    else {
+-                        more.m_length = (unsigned)banner1->payloads.tcp[tcb->port_them]->hello_length;
+-                        more.m_payload = banner1->payloads.tcp[tcb->port_them]->hello;
+-                        more.is_payload_dynamic = 0;
+-                    }
+-                    
+-                    /*
++            assert(action == APP_CONNECTED);
++            LOGSEND(tcb, "+timeout");
++            timeouts_add(tcpcon->timeouts,
++                         tcb->timeout,
++                         offsetof(struct TCP_Control_Block, timeout),
++                         TICKS_FROM_TV(secs + tcpcon->timeout_hello, usecs));
++            /* Start of connection */
++            tcb->tcpstate = STATE_ESTABLISHED_RECV;
++            tcb->established = App_ReceiveHello;
++        }
++        break;
++    case App_ReceiveHello:
++        if (action == APP_RECV_TIMEOUT)
++        {
++            struct ProtocolParserStream *stream = banner1->payloads.tcp[tcb->port_them];
++
++            if (stream)
++            {
++                struct InteractiveData more = {0};
++                unsigned ctrl = 0;
++
++                if (stream->transmit_hello)
++                    stream->transmit_hello(banner1, &more);
++                else
++                {
++                    more.m_length = (unsigned)banner1->payloads.tcp[tcb->port_them]->hello_length;
++                    more.m_payload = banner1->payloads.tcp[tcb->port_them]->hello;
++                    more.is_payload_dynamic = 0;
++                }
++
++                /*
+                      * Kludge
+                      */
+-                    if (banner1->payloads.tcp[tcb->port_them] == &banner_ssl) {
+-                        tcb->banner1_state.is_sent_sslhello = 1;
+-                    }
+-                    
+-                    /*
++                if (banner1->payloads.tcp[tcb->port_them] == &banner_ssl)
++                {
++                    tcb->banner1_state.is_sent_sslhello = 1;
++                }
++
++                /*
+                      * KLUDGE
+                      */
+-                    if (tcpcon->banner1->is_heartbleed) {
+-                        ctrl = CTRL_SMALL_WINDOW;
+-                    }
+-                    
+-                    /*
++                if (tcpcon->banner1->is_heartbleed)
++                {
++                    ctrl = CTRL_SMALL_WINDOW;
++                }
++
++                /*
+                      * Queue up the packet to be sent
+                      */
+-                    LOGip(4, tcb->ip_them, tcb->port_them, "sending payload %u bytes\n", more.m_length);
+-                    LOGSEND(tcb, "peer(payload)");
+-                    tcpcon_send_packet(tcpcon, tcb, 0x18, more.m_payload, more.m_length, ctrl);
+-                    tcb->seqno_me += (uint32_t)more.m_length;
+-                    tcb->is_payload_dynamic = more.is_payload_dynamic;
+-                    tcb->tcpstate = STATE_ESTABLISHED_SEND;
+-                    
+-                    //tcb->established = App_SendNext;
+-                }
+-                
+-                /* Add a timeout so that we can resend the data in case it
++                LOGip(4, tcb->ip_them, tcb->port_them, "sending payload %u bytes\n", more.m_length);
++                LOGSEND(tcb, "peer(payload)");
++                tcpcon_send_packet(tcpcon, tcb, 0x18, more.m_payload, more.m_length, ctrl);
++                tcb->seqno_me += (uint32_t)more.m_length;
++                tcb->is_payload_dynamic = more.is_payload_dynamic;
++                tcb->tcpstate = STATE_ESTABLISHED_SEND;
++
++                //tcb->established = App_SendNext;
++            }
++
++            /* Add a timeout so that we can resend the data in case it
+                  * goes missing. Note that we put this back in the timeout
+                  * system regardless if we've sent data. */
+-                LOGSEND(tcb, "+timeout");
+-                timeouts_add(   tcpcon->timeouts,
+-                             tcb->timeout,
+-                             offsetof(struct TCP_Control_Block, timeout),
+-                             TICKS_FROM_TV(secs+1,usecs)
+-                             );
+-                break;
+-            } else if (action == APP_RECV_PAYLOAD) {
+-                tcb->established = App_ReceiveNext;
+-                /* fall through */
+-            }
++            LOGSEND(tcb, "+timeout");
++            timeouts_add(tcpcon->timeouts,
++                         tcb->timeout,
++                         offsetof(struct TCP_Control_Block, timeout),
++                         TICKS_FROM_TV(secs + 1, usecs));
++            break;
++        }
++        else if (action == APP_RECV_PAYLOAD)
++        {
++            tcb->established = App_ReceiveNext;
+             /* fall through */
+-        case App_ReceiveNext:
+-            if (action == APP_RECV_PAYLOAD) {
+-                struct InteractiveData more = {0};
+-                
+-                /* [--banners]
++        }
++        /* fall through */
++    case App_ReceiveNext:
++        if (action == APP_RECV_PAYLOAD)
++        {
++            struct InteractiveData more = {0};
++
++            /* [--banners]
+                  * This is an important part of the system, where the TCP
+                  * stack passes incoming packet payloads off to the application
+                  * layer protocol parsers. This is where, in Sockets API, you
+                  * might call the 'recv()' function.
+                  */
+-                parse_banner(
+-                                   tcpcon,
+-                                   tcb,
+-                                   payload,
+-                                   payload_length,
+-                                   &more);
+-                
+-                /* move their sequence number forward */
+-                tcb->seqno_them += (unsigned)payload_length;
+-                
+-                /* acknowledge the bytes received */
+-                if (more.m_length) {
+-                    LOGSEND(tcb, "peer(ACK)");
+-                    LOGSEND(tcb, "peer(payload)");
+-                    tcpcon_send_packet(tcpcon, tcb, 0x18, more.m_payload, more.m_length, 0);
+-                    tcb->seqno_me += (uint32_t)more.m_length;
+-                    tcb->is_payload_dynamic = more.is_payload_dynamic;
+-                    tcb->tcpstate = STATE_ESTABLISHED_SEND;
+-                    tcb->established = App_SendNext;
+-                    LOGip(4, tcb->ip_them, tcb->port_them, "sending payload %u bytes\n", more.m_length);
+-                    
+-                } else {
+-                    LOGSEND(tcb, "peer(ACK)");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x10,
+-                                       0, 0, 0);
+-                }
+-                
+-                if (more.is_closing) {
+-                    /* Send FIN packet */
+-                    LOGSEND(tcb, "peer(FIN)");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x11,
+-                                       0, 0, 0);
+-                    tcb->seqno_me++;
+-                    
+-                    tcb->tcpstate = STATE_FIN_WAIT1;
+-                    LOGSEND(tcb, "+timeout");
+-
+-                    timeouts_add(   tcpcon->timeouts,
+-                                 tcb->timeout,
+-                                 offsetof(struct TCP_Control_Block, timeout),
+-                                 TICKS_FROM_TV(secs+1,usecs)
+-                                 );
+-                    //tcpcon_destroy_tcb(tcpcon, tcb, Reason_StateDone);
+-                }
++            parse_banner(
++                tcpcon,
++                tcb,
++                payload,
++                payload_length,
++                &more);
++
++            /* move their sequence number forward */
++            tcb->seqno_them += (unsigned)payload_length;
++
++            /* acknowledge the bytes received */
++            if (more.m_length)
++            {
++                LOGSEND(tcb, "peer(ACK)");
++                LOGSEND(tcb, "peer(payload)");
++                tcpcon_send_packet(tcpcon, tcb, 0x18, more.m_payload, more.m_length, 0);
++                tcb->seqno_me += (uint32_t)more.m_length;
++                tcb->is_payload_dynamic = more.is_payload_dynamic;
++                tcb->tcpstate = STATE_ESTABLISHED_SEND;
++                tcb->established = App_SendNext;
++                LOGip(4, tcb->ip_them, tcb->port_them, "sending payload %u bytes\n", more.m_length);
+             }
+-            break;
+-        case App_SendNext:
+-            if (action == APP_SEND_SENT) {
+-                tcb->tcpstate = STATE_ESTABLISHED_RECV;
+-                tcb->established = App_ReceiveNext;
++            else
++            {
++                LOGSEND(tcb, "peer(ACK)");
++                tcpcon_send_packet(tcpcon, tcb,
++                                   0x10,
++                                   0, 0, 0);
+             }
+-            break;
+-        default:
+-            LOG(0, "TCP state error\n");
+-            exit(1);
+-            break;
++
++            if (more.is_closing)
++            {
++                /* Send FIN packet */
++                LOGSEND(tcb, "peer(FIN)");
++                tcpcon_send_packet(tcpcon, tcb,
++                                   0x11,
++                                   0, 0, 0);
++                tcb->seqno_me++;
++
++                tcb->tcpstate = STATE_FIN_WAIT1;
++                LOGSEND(tcb, "+timeout");
++
++                timeouts_add(tcpcon->timeouts,
++                             tcb->timeout,
++                             offsetof(struct TCP_Control_Block, timeout),
++                             TICKS_FROM_TV(secs + 1, usecs));
++                //tcpcon_destroy_tcb(tcpcon, tcb, Reason_StateDone);
++            }
++        }
++        break;
++    case App_SendNext:
++        if (action == APP_SEND_SENT)
++        {
++            tcb->tcpstate = STATE_ESTABLISHED_RECV;
++            tcb->established = App_ReceiveNext;
++        }
++        break;
++    default:
++        LOG(0, "TCP state error\n");
++        exit(1);
++        break;
+     }
+ }
+ 
+-
+ /*****************************************************************************
+  * Handles incoming events, like timeouts and packets, that cause a change
+  * in the TCP control block "state".
+@@ -1397,12 +1440,11 @@ application(struct TCP_ConnectionTable *tcpcon,
+  * you see drawn everywhere, where they have states like "TIME_WAIT". Only
+  * we don't really have those states.
+  *****************************************************************************/
+-int
+-stack_incoming_tcp(struct TCP_ConnectionTable *tcpcon,
+-              struct TCP_Control_Block *tcb,
+-              int in_what, const void *vpayload, size_t payload_length,
+-              unsigned secs, unsigned usecs,
+-              unsigned seqno_them)
++int stack_incoming_tcp(struct TCP_ConnectionTable *tcpcon,
++                       struct TCP_Control_Block *tcb,
++                       int in_what, const void *vpayload, size_t payload_length,
++                       unsigned secs, unsigned usecs,
++                       unsigned seqno_them)
+ {
+     enum TCP_What what = in_what;
+     const unsigned char *payload = (const unsigned char *)vpayload;
+@@ -1415,27 +1457,29 @@ stack_incoming_tcp(struct TCP_ConnectionTable *tcpcon,
+           what_to_string(what));
+ 
+     /* Make sure no connection lasts more than ~30 seconds */
+-    if (what == TCP_WHAT_TIMEOUT) {
+-        if (tcb->when_created + tcpcon->timeout_connection < secs) {
++    if (what == TCP_WHAT_TIMEOUT)
++    {
++        if (tcb->when_created + tcpcon->timeout_connection < secs)
++        {
+             LOGip(8, tcb->ip_them, tcb->port_them,
+-                "%s                \n",
+-                "CONNECTION TIMEOUT---");
++                  "%s                \n",
++                  "CONNECTION TIMEOUT---");
+             LOGSEND(tcb, "peer(RST)");
+             tcpcon_send_packet(tcpcon, tcb,
+-                0x04,
+-                0, 0, 0);
++                               0x04,
++                               0, 0, 0);
+             tcpcon_destroy_tcb(tcpcon, tcb, Reason_Timeout);
+             return 1;
+         }
+     }
+-    
+-    if (what == TCP_WHAT_RST) {
++
++    if (what == TCP_WHAT_RST)
++    {
+         LOGSEND(tcb, "tcb(destroy)");
+         tcpcon_destroy_tcb(tcpcon, tcb, Reason_RST);
+         return 1;
+     }
+-    
+-    
++
+     /*
+      *
+      *
+@@ -1444,255 +1488,264 @@ stack_incoming_tcp(struct TCP_ConnectionTable *tcpcon,
+      *
+      *
+      */
+-    switch (tcb->tcpstate) {
+-            /* TODO: validate any SYNACK is real before sending it here
++    switch (tcb->tcpstate)
++    {
++        /* TODO: validate any SYNACK is real before sending it here
+              * to the state-machine, by validating that it's acking
+              * something */
+-        case STATE_SYN_SENT:
+-            switch (what) {
+-                case TCP_WHAT_RST:
+-                case TCP_WHAT_TIMEOUT:
+-                //case TCP_WHAT_SYNACK:
+-                case TCP_WHAT_FIN:
+-                case TCP_WHAT_ACK:
+-                case TCP_WHAT_DATA:
+-                    break;
+-                case TCP_WHAT_SYNACK:
+-                    /* Send "ACK" to acknowlege their "SYN-ACK" */
+-                    LOGSEND(tcb, "peer(ACK) [acknowledge SYN-ACK 1]");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x10,
+-                                       0, 0, 0);
+-                    LOGSEND(tcb, "app(connected)");
+-                    application(tcpcon, tcb, APP_CONNECTED, 0, 0, secs, usecs);
+-                    break;
+-                }
++    case STATE_SYN_SENT:
++        switch (what)
++        {
++        case TCP_WHAT_RST:
++        case TCP_WHAT_TIMEOUT:
++        //case TCP_WHAT_SYNACK:
++        case TCP_WHAT_FIN:
++        case TCP_WHAT_ACK:
++        case TCP_WHAT_DATA:
+             break;
+-        case STATE_ESTABLISHED_SEND:
+-        case STATE_ESTABLISHED_RECV:
+-            switch (what) {
+-                case TCP_WHAT_RST:
+-                    break;
+-                case TCP_WHAT_SYNACK:
+-                    /* Send "ACK" to acknowlege their "SYN-ACK" */
+-                    LOGSEND(tcb, "peer(ACK) [acknowledge SYN-ACK 2]");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x10, /* ACK */
+-                                       0, 0, 0);
+-                    break;
+-                case TCP_WHAT_FIN:
+-                    if (tcb->tcpstate == STATE_ESTABLISHED_RECV) {
+-                        tcb->seqno_them = seqno_them + 1;
+-                        
+-                        LOGSEND(tcb, "peer(FIN)");
+-                        tcpcon_send_packet(tcpcon, tcb,
+-                                           0x11, /* FIN-ACK */
+-                                           0, 0, 0);
+-                        tcb->seqno_me++;
+-                        tcb->tcpstate = STATE_LAST_ACK;
+-                    } else if (tcb->tcpstate == STATE_ESTABLISHED_RECV) {
+-                        /* Do nothing, the same thing as if we received data
++        case TCP_WHAT_SYNACK:
++            /* Send "ACK" to acknowlege their "SYN-ACK" */
++            LOGSEND(tcb, "peer(ACK) [acknowledge SYN-ACK 1]");
++            tcpcon_send_packet(tcpcon, tcb,
++                               0x10,
++                               0, 0, 0);
++            LOGSEND(tcb, "app(connected)");
++            application(tcpcon, tcb, APP_CONNECTED, 0, 0, secs, usecs);
++            break;
++        }
++        break;
++    case STATE_ESTABLISHED_SEND:
++    case STATE_ESTABLISHED_RECV:
++        switch (what)
++        {
++        case TCP_WHAT_RST:
++            break;
++        case TCP_WHAT_SYNACK:
++            /* Send "ACK" to acknowlege their "SYN-ACK" */
++            LOGSEND(tcb, "peer(ACK) [acknowledge SYN-ACK 2]");
++            tcpcon_send_packet(tcpcon, tcb,
++                               0x10, /* ACK */
++                               0, 0, 0);
++            break;
++        case TCP_WHAT_FIN:
++            if (tcb->tcpstate == STATE_ESTABLISHED_RECV)
++            {
++                tcb->seqno_them = seqno_them + 1;
++
++                LOGSEND(tcb, "peer(FIN)");
++                tcpcon_send_packet(tcpcon, tcb,
++                                   0x11, /* FIN-ACK */
++                                   0, 0, 0);
++                tcb->seqno_me++;
++                tcb->tcpstate = STATE_LAST_ACK;
++            }
++            else if (tcb->tcpstate == STATE_ESTABLISHED_RECV)
++            {
++                /* Do nothing, the same thing as if we received data
+                          * during the SEND state. The other side will send it
+                          * again after it has acknowledged our data */
+-                        ;
+-                    }
+-                    break;
+-                case TCP_WHAT_ACK:
+-                    /* There's actually nothing that goes on in this state. We are
++                ;
++            }
++            break;
++        case TCP_WHAT_ACK:
++            /* There's actually nothing that goes on in this state. We are
+                      * just waiting for the timer to expire. In the meanwhile,
+                      * though, the other side is might acknowledge that we sent
+                      * a SYN-ACK */
+-                     
+-                    /* NOTE: the arg 'payload_length' was overloaded here to be the
++
++            /* NOTE: the arg 'payload_length' was overloaded here to be the
+                      * 'ackno' instead */
+-                    handle_ack( tcb, (uint32_t)payload_length);
+-                    if (tcb->tcpstate == STATE_ESTABLISHED_SEND) {
+-                        if (tcb->ackno_them - tcb->seqno_me == 0) {
+-                            /* All the payload has been sent */
+-                            if (tcb->is_payload_dynamic)
+-                                free((void*)tcb->payload);
+-                            tcb->payload = 0;
+-                            tcb->payload_length = 0;
+-                            tcb->is_payload_dynamic = 0;
+-                            
+-                            LOGSEND(tcb, "app(sent)");
+-                            application(tcpcon, tcb, APP_SEND_SENT, 0, 0, secs, usecs);
+-                            tcb->tcpstate = STATE_ESTABLISHED_RECV;
+-                            LOGSEND(tcb, "+timeout");
+-                            timeouts_add(   tcpcon->timeouts,
+-                                         tcb->timeout,
+-                                         offsetof(struct TCP_Control_Block, timeout),
+-                                         TICKS_FROM_TV(secs+10,usecs)
+-                                         );
+-                        } else {
+-                            /* Reset the timeout, waiting for more data to arrive */
+-                            LOGSEND(tcb, "+timeout");
+-                            timeouts_add(   tcpcon->timeouts,
+-                                         tcb->timeout,
+-                                         offsetof(struct TCP_Control_Block, timeout),
+-                                         TICKS_FROM_TV(secs+1,usecs)
+-                                         );
+-                            
+-                        }
+-                    }
+-                    break;
+-                case TCP_WHAT_TIMEOUT:
+-                    if (tcb->tcpstate == STATE_ESTABLISHED_RECV) {
+-                        /* Didn't receive data in the expected timeframe. This is
++            handle_ack(tcb, (uint32_t)payload_length);
++            if (tcb->tcpstate == STATE_ESTABLISHED_SEND)
++            {
++                if (tcb->ackno_them - tcb->seqno_me == 0)
++                {
++                    /* All the payload has been sent */
++                    if (tcb->is_payload_dynamic)
++                        free((void *)tcb->payload);
++                    tcb->payload = 0;
++                    tcb->payload_length = 0;
++                    tcb->is_payload_dynamic = 0;
++
++                    LOGSEND(tcb, "app(sent)");
++                    application(tcpcon, tcb, APP_SEND_SENT, 0, 0, secs, usecs);
++                    tcb->tcpstate = STATE_ESTABLISHED_RECV;
++                    LOGSEND(tcb, "+timeout");
++                    timeouts_add(tcpcon->timeouts,
++                                 tcb->timeout,
++                                 offsetof(struct TCP_Control_Block, timeout),
++                                 TICKS_FROM_TV(secs + 10, usecs));
++                }
++                else
++                {
++                    /* Reset the timeout, waiting for more data to arrive */
++                    LOGSEND(tcb, "+timeout");
++                    timeouts_add(tcpcon->timeouts,
++                                 tcb->timeout,
++                                 offsetof(struct TCP_Control_Block, timeout),
++                                 TICKS_FROM_TV(secs + 1, usecs));
++                }
++            }
++            break;
++        case TCP_WHAT_TIMEOUT:
++            if (tcb->tcpstate == STATE_ESTABLISHED_RECV)
++            {
++                /* Didn't receive data in the expected timeframe. This is
+                          * often a normal condition, such as during the start
+                          * of a scanned connection, when we don't understand the
+                          * protocol and are simply waiting for anything the
+                          * server might send us.
+                          */
+-                        LOGSEND(tcb, "app(timeout)");
+-                        application(tcpcon, tcb, APP_RECV_TIMEOUT, 0, 0, secs, usecs);
+-                    } else if (tcb->tcpstate == STATE_ESTABLISHED_SEND) {
+-                        /*
++                LOGSEND(tcb, "app(timeout)");
++                application(tcpcon, tcb, APP_RECV_TIMEOUT, 0, 0, secs, usecs);
++            }
++            else if (tcb->tcpstate == STATE_ESTABLISHED_SEND)
++            {
++                /*
+                          * We did not get a complete ACK of our sent data, so retransmit
+                          * it to the server
+                          */
+-                        uint32_t len;
+-                        
+-                        
+-                        len = tcb->seqno_me - tcb->ackno_them;
+-                        
+-                        /* Resend the payload */
+-                        tcb->seqno_me -= len;
+-                        LOGSEND(tcb, "peer(payload) retransmit");
+-                        
+-                        /* kludge: should never be NULL< but somehow is */
+-                        if (tcb->payload) 
+-                        tcpcon_send_packet(tcpcon, tcb,
+-                                           0x18,
+-                                           tcb->payload + tcb->payload_length - len,
+-                                           len, 0);
+-                        tcb->seqno_me += len;
+-                        
+-                        
+-                        /* Now that we've resent the packet, register another
++                uint32_t len;
++
++                len = tcb->seqno_me - tcb->ackno_them;
++
++                /* Resend the payload */
++                tcb->seqno_me -= len;
++                LOGSEND(tcb, "peer(payload) retransmit");
++
++                /* kludge: should never be NULL< but somehow is */
++                if (tcb->payload)
++                    tcpcon_send_packet(tcpcon, tcb,
++                                       0x18,
++                                       tcb->payload + tcb->payload_length - len,
++                                       len, 0);
++                tcb->seqno_me += len;
++
++                /* Now that we've resent the packet, register another
+                          * timeout in order to resend it yet again if not
+                          * acknowledged. */
+-                        LOGSEND(tcb, "+timeout");
+-                        timeouts_add(tcpcon->timeouts,
+-                                     tcb->timeout,
+-                                     offsetof(struct TCP_Control_Block, timeout),
+-                                     TICKS_FROM_TV(secs+2,usecs)
+-                                     );
+-                    }
+-        
+-                    break;
+-                case TCP_WHAT_DATA:
+-                    
+-                    if ((unsigned)(tcb->seqno_them - seqno_them) > payload_length)  {
+-                        LOGSEND(tcb, "peer(ACK) [acknowledge payload 1]");
+-                        tcpcon_send_packet(tcpcon, tcb,
+-                                           0x10,
+-                                           0, 0, 0);
+-                        return 1;
+-                    }
+-                    
+-                    while (seqno_them != tcb->seqno_them && payload_length) {
+-                        seqno_them++;
+-                        payload_length--;
+-                        payload++;
+-                    }
+-                    
+-                    if (payload_length == 0) {
+-                        LOGSEND(tcb, "peer(ACK) [acknowledge empty data]");
+-                        tcpcon_send_packet(tcpcon, tcb,
+-                                           0x10,
+-                                           0, 0, 0);
+-                        return 1;
+-                    }
+-                    
+-                    LOGSEND(tcb, "app(payload)");
+-                    application(tcpcon, tcb, APP_RECV_PAYLOAD, payload, payload_length, secs, usecs);
+-                    
+-                    /* Send ack for the data */
+-                    LOGSEND(tcb, "peer(ACK) [acknowledge payload 2]");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x10,
+-                                       0, 0, 0);
+-                    break;
++                LOGSEND(tcb, "+timeout");
++                timeouts_add(tcpcon->timeouts,
++                             tcb->timeout,
++                             offsetof(struct TCP_Control_Block, timeout),
++                             TICKS_FROM_TV(secs + 2, usecs));
++            }
+ 
++            break;
++        case TCP_WHAT_DATA:
++
++            if ((unsigned)(tcb->seqno_them - seqno_them) > payload_length)
++            {
++                LOGSEND(tcb, "peer(ACK) [acknowledge payload 1]");
++                tcpcon_send_packet(tcpcon, tcb,
++                                   0x10,
++                                   0, 0, 0);
++                return 1;
+             }
++
++            while (seqno_them != tcb->seqno_them && payload_length)
++            {
++                seqno_them++;
++                payload_length--;
++                payload++;
++            }
++
++            if (payload_length == 0)
++            {
++                LOGSEND(tcb, "peer(ACK) [acknowledge empty data]");
++                tcpcon_send_packet(tcpcon, tcb,
++                                   0x10,
++                                   0, 0, 0);
++                return 1;
++            }
++
++            LOGSEND(tcb, "app(payload)");
++            application(tcpcon, tcb, APP_RECV_PAYLOAD, payload, payload_length, secs, usecs);
++
++            /* Send ack for the data */
++            LOGSEND(tcb, "peer(ACK) [acknowledge payload 2]");
++            tcpcon_send_packet(tcpcon, tcb,
++                               0x10,
++                               0, 0, 0);
+             break;
+-        case STATE_FIN_WAIT1:
+-            switch (what) {
+-                case TCP_WHAT_TIMEOUT:
+-                    /* resend FIN packet */
+-                    LOGSEND(tcb, "peer(FIN)");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x11,
+-                                       0, 0, 0);
+-                    
+-                    /* reset timeout */
+-                    LOGSEND(tcb, "+timeout");
+-                    timeouts_add(   tcpcon->timeouts,
+-                                 tcb->timeout,
+-                                 offsetof(struct TCP_Control_Block, timeout),
+-                                 TICKS_FROM_TV(secs+1,usecs)
+-                                 );
+-                    break;
+-                case TCP_WHAT_ACK:
+-                    if (handle_ack( tcb, (uint32_t)payload_length)) {
+-                        tcb->tcpstate = STATE_FIN_WAIT2;
+-                        LOGSEND(tcb, "+timeout");
+-                        timeouts_add(   tcpcon->timeouts,
+-                                     tcb->timeout,
+-                                     offsetof(struct TCP_Control_Block, timeout),
+-                                     TICKS_FROM_TV(secs+5,usecs)
+-                                     );
+-                    }
+-                    break;
+-                case TCP_WHAT_FIN:
+-                    break;
+-                case TCP_WHAT_SYNACK:
+-                case TCP_WHAT_RST:
+-                case TCP_WHAT_DATA:
+-                    break;
++        }
++        break;
++    case STATE_FIN_WAIT1:
++        switch (what)
++        {
++        case TCP_WHAT_TIMEOUT:
++            /* resend FIN packet */
++            LOGSEND(tcb, "peer(FIN)");
++            tcpcon_send_packet(tcpcon, tcb,
++                               0x11,
++                               0, 0, 0);
++
++            /* reset timeout */
++            LOGSEND(tcb, "+timeout");
++            timeouts_add(tcpcon->timeouts,
++                         tcb->timeout,
++                         offsetof(struct TCP_Control_Block, timeout),
++                         TICKS_FROM_TV(secs + 1, usecs));
++            break;
++        case TCP_WHAT_ACK:
++            if (handle_ack(tcb, (uint32_t)payload_length))
++            {
++                tcb->tcpstate = STATE_FIN_WAIT2;
++                LOGSEND(tcb, "+timeout");
++                timeouts_add(tcpcon->timeouts,
++                             tcb->timeout,
++                             offsetof(struct TCP_Control_Block, timeout),
++                             TICKS_FROM_TV(secs + 5, usecs));
+             }
+             break;
+-            
+-        case STATE_FIN_WAIT2:
+-        case STATE_TIME_WAIT:
+-            switch (what) {
+-                case TCP_WHAT_TIMEOUT:
+-                    if (tcb->tcpstate == STATE_TIME_WAIT) {
+-                        tcpcon_destroy_tcb(tcpcon, tcb, Reason_Timeout);
+-                        return 1;
+-                    }
+-                    break;
+-                case TCP_WHAT_ACK:
+-                    break;
+-                case TCP_WHAT_FIN:
+-                    tcb->seqno_them = seqno_them + 1;
+-                    LOGSEND(tcb, "peer(ACK) [acknowledge FIN]");
+-                    tcpcon_send_packet(tcpcon, tcb,
+-                                       0x10,
+-                                       0, 0, 0);
+-                    tcb->tcpstate = STATE_TIME_WAIT;
+-                    LOGSEND(tcb, "+timeout");
+-                    timeouts_add(   tcpcon->timeouts,
+-                                 tcb->timeout,
+-                                 offsetof(struct TCP_Control_Block, timeout),
+-                                 TICKS_FROM_TV(secs+5,usecs)
+-                                 );
+-                    break;
+-                case TCP_WHAT_SYNACK:
+-                case TCP_WHAT_RST:
+-                case TCP_WHAT_DATA:
+-                    break;
++        case TCP_WHAT_FIN:
++            break;
++        case TCP_WHAT_SYNACK:
++        case TCP_WHAT_RST:
++        case TCP_WHAT_DATA:
++            break;
++        }
++        break;
++
++    case STATE_FIN_WAIT2:
++    case STATE_TIME_WAIT:
++        switch (what)
++        {
++        case TCP_WHAT_TIMEOUT:
++            if (tcb->tcpstate == STATE_TIME_WAIT)
++            {
++                tcpcon_destroy_tcb(tcpcon, tcb, Reason_Timeout);
++                return 1;
+             }
+             break;
+-
+-        case STATE_LAST_ACK:
+-            LOGip(1, tcb->ip_them, tcb->port_them, "=%s : %s                  \n", state_to_string(tcb->tcpstate), what_to_string(what));
+-            //LOG(1, "TCP-state: unknown state\n");
++        case TCP_WHAT_ACK:
++            break;
++        case TCP_WHAT_FIN:
++            tcb->seqno_them = seqno_them + 1;
++            LOGSEND(tcb, "peer(ACK) [acknowledge FIN]");
++            tcpcon_send_packet(tcpcon, tcb,
++                               0x10,
++                               0, 0, 0);
++            tcb->tcpstate = STATE_TIME_WAIT;
++            LOGSEND(tcb, "+timeout");
++            timeouts_add(tcpcon->timeouts,
++                         tcb->timeout,
++                         offsetof(struct TCP_Control_Block, timeout),
++                         TICKS_FROM_TV(secs + 5, usecs));
+             break;
+-        default:
+-            LOG(1, "TCP-state: unknown state\n");
++        case TCP_WHAT_SYNACK:
++        case TCP_WHAT_RST:
++        case TCP_WHAT_DATA:
++            break;
++        }
++        break;
++
++    case STATE_LAST_ACK:
++        LOGip(1, tcb->ip_them, tcb->port_them, "=%s : %s                  \n", state_to_string(tcb->tcpstate), what_to_string(what));
++        //LOG(1, "TCP-state: unknown state\n");
++        break;
++    default:
++        LOG(1, "TCP-state: unknown state\n");
+     }
+     return 1;
+ }
+-

@@ -1,0 +1,2569 @@
+diff --git a/.gitattributes b/.gitattributes
+deleted file mode 100644
+index 4f2cee1..0000000
+--- a/.gitattributes
++++ /dev/null
+@@ -1,4 +0,0 @@
+-
+-
+-*.c text eol=lf
+-
+diff --git a/.gitignore b/.gitignore
+deleted file mode 100644
+index 642828d..0000000
+--- a/.gitignore
++++ /dev/null
+@@ -1,3 +0,0 @@
+-paused.conf
+-.Makefile.swp
+-.vscode
+diff --git a/.travis.yml b/.travis.yml
+deleted file mode 100644
+index 701dbd5..0000000
+--- a/.travis.yml
++++ /dev/null
+@@ -1,24 +0,0 @@
+-# This is a build/test script for "travis-ci", a continuous
+-# integration website that will build and test this project
+-# every time something is submitted, and send me email if
+-# the test breaks
+-arch:
+-  - amd64
+-  - ppc64le
+-language: c
+-
+-os:
+-  - linux
+-  - osx
+-  
+-compiler:
+-  - gcc
+-  - clang
+-
+-before_install:
+-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install -y libpcap-dev; fi
+-
+-script:
+-  - make test
+-
+-
+diff --git a/Makefile b/Makefile
+deleted file mode 100644
+index 9c94cfe..0000000
+--- a/Makefile
++++ /dev/null
+@@ -1,131 +0,0 @@
+-# Try to figure out the default compiler. I dont know the best
+-# way to do this with `gmake`. If you have better ideas, please
+-# submit a pull request on github.
+-ifeq ($(CC),)
+-ifneq (, $(shell which clang))
+-CC = clang
+-else ifneq (, $(shell which gcc))
+-CC = gcc
+-else
+-CC = cc
+-endif
+-endif
+-
+-PREFIX ?= /usr
+-BINDIR ?= $(PREFIX)/bin
+-SYS := $(shell $(CC) -dumpmachine)
+-GITVER := $(shell git describe --tags)
+-INSTALL_DATA := -pDm755
+-
+-ifeq ($(GITVER),)
+-GITVER = "unknown"
+-endif
+-
+-# LINUX
+-# The automated regression tests run on Linux, so this is the one
+-# environment where things likely will work -- as well as anything
+-# works on the bajillion of different Linux environments
+-ifneq (, $(findstring linux, $(SYS)))
+-ifneq (, $(findstring musl, $(SYS)))
+-LIBS = 
+-else
+-LIBS = -lm -lrt -ldl -lpthread
+-endif
+-INCLUDES =
+-FLAGS2 = 
+-endif
+-
+-# MAC OS X
+-# I occassionally develope code on Mac OS X, but it's not part of
+-# my regularly regression-test environment. That means at any point
+-# in time, something might be minorly broken in Mac OS X.
+-ifneq (, $(findstring darwin, $(SYS)))
+-LIBS = -lm 
+-INCLUDES = -I.
+-FLAGS2 = 
+-INSTALL_DATA = -pm755
+-endif
+-
+-# MinGW on Windows
+-# I develope on Visual Studio 2010, so that's the Windows environment
+-# that'll work. However, 'git' on Windows runs under MingGW, so one
+-# day I acccidentally typed 'make' instead of 'git, and felt compelled
+-# to then fix all the errors, so this kinda works now. It's not the
+-# intended environment, so it make break in the future.
+-ifneq (, $(findstring mingw, $(SYS)))
+-INCLUDES = -Ivs10/include
+-LIBS = -L vs10/lib -lIPHLPAPI -lWs2_32
+-FLAGS2 = -march=i686
+-endif
+-
+-# Cygwin
+-# I hate Cygwin, use Visual Studio or MingGW instead. I just put this
+-# second here for completeness, or in case I gate tired of hitting my
+-# head with a hammer and want to feel a different sort of pain.
+-ifneq (, $(findstring cygwin, $(SYS)))
+-INCLUDES = -I.
+-LIBS = 
+-FLAGS2 = 
+-endif
+-
+-# OpenBSD
+-ifneq (, $(findstring openbsd, $(SYS)))
+-LIBS = -lm -lpthread
+-INCLUDES = -I.
+-FLAGS2 = 
+-endif
+-
+-# FreeBSD
+-ifneq (, $(findstring freebsd, $(SYS)))
+-LIBS = -lm -lpthread
+-INCLUDES = -I.
+-FLAGS2 =
+-endif
+-
+-# NetBSD
+-ifneq (, $(findstring netbsd, $(SYS)))
+-LIBS = -lm -lpthread
+-INCLUDES = -I.
+-FLAGS2 =
+-endif
+-
+-
+-DEFINES = 
+-CFLAGS = -g -ggdb $(FLAGS2) $(INCLUDES) $(DEFINES) -Wall -O2
+-.SUFFIXES: .c .cpp
+-
+-all: bin/masscan 
+-
+-
+-tmp/main-conf.o: src/main-conf.c src/*.h
+-	$(CC) $(CFLAGS) -c $< -o $@ -DGIT=\"$(GITVER)\"
+-
+-
+-# just compile everything in the 'src' directory. Using this technique
+-# means that include file dependencies are broken, so sometimes when
+-# the program crashes unexpectedly, 'make clean' then 'make' fixes the
+-# problem that a .h file was out of date
+-tmp/%.o: src/%.c src/*.h
+-	$(CC) $(CFLAGS) -c $< -o $@
+-
+-
+-SRC = $(sort $(wildcard src/*.c))
+-OBJ = $(addprefix tmp/, $(notdir $(addsuffix .o, $(basename $(SRC))))) 
+-
+-
+-bin/masscan: $(OBJ)
+-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LIBS)
+-
+-clean:
+-	rm -f tmp/*.o
+-	rm -f bin/masscan
+-
+-regress: bin/masscan
+-	bin/masscan --selftest
+-
+-test: regress
+-
+-install: bin/masscan
+-	install $(INSTALL_DATA) bin/masscan $(DESTDIR)$(BINDIR)/masscan
+-	
+-default: bin/masscan
+diff --git a/VULNINFO.md b/VULNINFO.md
+deleted file mode 100644
+index 9fe2068..0000000
+--- a/VULNINFO.md
++++ /dev/null
+@@ -1,69 +0,0 @@
+-# Vulnerability Information and Policy
+-
+-This document contains information about robustness of this project against
+-hacker attacks. It describes known vulnerabilities that have been found
+-in previous versions, and describes policies how vulnerabilities are handled.
+-
+-## Security contact
+-
+-robert_david_graham@yahoo.com
+-@ErrataRob on twitter
+-
+-
+-## Known vulnerabilities and advisories
+-
+-none
+-
+-## Bounty
+-
+-I'm offering $100, payable in cash or Bitcoin, for security vulnerabilities.
+-This is primarily for remote vulnerabilities, such as the ability of a target
+-to buffer-overflow the scanner, or even cause it to crash.
+-
+-But I'd consider other vulnerabilities as well. Does Kali ship this with suid
+-and there's a preload bug? That's not really a vuln in this code, but if it's 
+-something I could fix, I'd consider paying a bounty for it.
+-
+-
+-## Disclosure policy
+-
+-If you've got a vuln, just announce it. Please send info to the contact above
+-as well, please.
+-
+-I'll probably get around to fixing it within a month or so. This really isn't
+-heavily used software, so I'm lax on this.
+-
+-## Threats
+-
+-The primary threat is from hostile targets on the Internet sending back
+-responses in order to:
+-* exploit a buffer-overflow vulnerability
+-* spoof packets trying to give fraudulent scan results (mitigated with our
+-  SYN cookies)
+-* flood packets trying to overload bandwidth/storage
+-* bad data, such as corrupting banners or DNS names trying to exploit
+-  downstream consumers with bad html or script tags.
+-
+-The secondary threat is from use of the program. For example, when a bad
+-parameter is entered on the command-line, the program spits it back out
+-in a helpful error message. This is fine for a command-line program that
+-should run as `root` anyway, but if somebody tries to make it into a 
+-scriptable service, this becomes a potential vulnerability.
+-
+-## Safe code policy
+-
+-Unsafe functions like `strcpy()` are banned.
+-
+-The code contains an automated regression test by running with the 
+-`--regress` option. However, currently the regression only tests
+-a small percentage of the code.
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+diff --git a/debian/.gitignore b/debian/.gitignore
+deleted file mode 100644
+index cce480d..0000000
+--- a/debian/.gitignore
++++ /dev/null
+@@ -1,4 +0,0 @@
+-files
+-masscan
+-masscan.debhelper.log
+-masscan.substvars
+diff --git a/debian/README.Debian b/debian/README.Debian
+deleted file mode 100644
+index 0129f22..0000000
+--- a/debian/README.Debian
++++ /dev/null
+@@ -1,6 +0,0 @@
+-masscan for Debian
+-------------------
+-
+-Initial debianisation
+-
+- -- Vladimir Vitkov <vvitkov@sdl.com>  Fri, 24 Jan 2014 11:03:38 +0200
+diff --git a/debian/changelog b/debian/changelog
+deleted file mode 100644
+index cf22c30..0000000
+--- a/debian/changelog
++++ /dev/null
+@@ -1,18 +0,0 @@
+-masscan (1.0.3-46+gbbadb7b-1) precise; urgency=low
+-
+-  * Rebuild from current git
+-  * Use propper git hash versioning
+-
+- -- Vladimir Vitkov (Packaging Key) <vvitkov@sdl.com>  Tue, 10 Jun 2014 12:11:04 +0300
+-
+-masscan (1.0.1+git20140124-1) unstable; urgency=low
+-
+-  * Rebuild from current git
+-
+- -- Vladimir Vitkov <vvitkov@sdl.com>  Fri, 24 Jan 2014 14:37:30 +0200
+-
+-masscan (1.0.1+git20140106-1) unstable; urgency=low
+-
+-  * Initial release
+-
+- -- Vladimir Vitkov <vvitkov@sdl.com>  Fri, 24 Jan 2014 11:03:38 +0200
+diff --git a/debian/compat b/debian/compat
+deleted file mode 100644
+index 45a4fb7..0000000
+--- a/debian/compat
++++ /dev/null
+@@ -1 +0,0 @@
+-8
+diff --git a/debian/control b/debian/control
+deleted file mode 100644
+index c6249bc..0000000
+--- a/debian/control
++++ /dev/null
+@@ -1,24 +0,0 @@
+-Source: masscan
+-Section: net
+-Priority: extra
+-Maintainer: Vladimir Vitkov <vvitkov@sdl.com>
+-Build-Depends: debhelper (>= 8.0.0), libpcap-dev
+-Standards-Version: 3.9.3
+-Homepage: https://github.com/robertdavidgraham/masscan
+-#Vcs-Git: https://github.com/robertdavidgraham/masscan.git
+-#Vcs-Browser: http://git.debian.org/?p=collab-maint/masscan.git;a=summary
+-
+-Package: masscan
+-Architecture: any
+-Depends: ${shlibs:Depends}, ${misc:Depends}
+-Description: Mass IP port scanner
+- This is the fastest Internet port scanner. It can scan the
+- entire Internet in under 6 minutes, transmitting 10 million
+- packets per second.
+- .
+- It produces results similar to nmap, the most famous port
+- scanner. Internally, it operates more like scanrand,
+- unicornscan, and ZMap, using asynchronous transmission.
+- The major difference is that it's faster than these other
+- scanners. In addition, it's more flexible, allowing
+- arbitrary address ranges and port ranges.
+diff --git a/debian/copyright b/debian/copyright
+deleted file mode 100644
+index 5f26534..0000000
+--- a/debian/copyright
++++ /dev/null
+@@ -1,45 +0,0 @@
+-Format: http://dep.debian.net/deps/dep5
+-Upstream-Name: masscan
+-Source: https://github.com/robertdavidgraham/masscan
+-
+-Files: *
+-Copyright: 2013 Robert David Graham <robert_david_graham@yahoo.com>
+-License: AGPL
+- This program, "masscan", is not completely free software. It may not be
+- used by the United States Department of Defense (DoD) or National Security
+- Agency (NSA), or by agents acting on their behalf, such as contractors,
+- sub-contractors, and so on. These entitities must contact me to acquire
+- a different license.
+- .
+- Barring the above exception, you can use, redistribute, and/or modify
+- this code under the terms of the GNU Affero General Public License
+- version 3.
+- .
+- This program is distributed in the hope that it will be useful,
+- but WITHOUT ANY WARRANTY; without even the implied warranty of
+- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- GNU Affero General Public License for more details.
+- .
+- You should have received a copy of the GNU Affero General Public License
+- along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-Files: debian/*
+-Copyright: 2014 Vladimir Vitkov <vvitkov@sdl.com>
+-License: GPL-3.0+
+-
+-License: GPL-3.0+
+- This program is free software: you can redistribute it and/or modify
+- it under the terms of the GNU General Public License as published by
+- the Free Software Foundation, either version 3 of the License, or
+- (at your option) any later version.
+- .
+- This package is distributed in the hope that it will be useful,
+- but WITHOUT ANY WARRANTY; without even the implied warranty of
+- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- GNU General Public License for more details.
+- .
+- You should have received a copy of the GNU General Public License
+- along with this program. If not, see <http://www.gnu.org/licenses/>.
+- .
+- On Debian systems, the complete text of the GNU General
+- Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
+diff --git a/debian/masscan.dirs b/debian/masscan.dirs
+deleted file mode 100644
+index e772481..0000000
+--- a/debian/masscan.dirs
++++ /dev/null
+@@ -1 +0,0 @@
+-usr/bin
+diff --git a/debian/masscan.docs b/debian/masscan.docs
+deleted file mode 100644
+index 1aaea9c..0000000
+--- a/debian/masscan.docs
++++ /dev/null
+@@ -1,4 +0,0 @@
+-README.md
+-VULNINFO.md
+-doc/algorithm.js
+-doc/bot.html
+diff --git a/debian/masscan.install b/debian/masscan.install
+deleted file mode 100644
+index a59004c..0000000
+--- a/debian/masscan.install
++++ /dev/null
+@@ -1 +0,0 @@
+-bin/masscan usr/bin/
+diff --git a/debian/masscan.manpages b/debian/masscan.manpages
+deleted file mode 100644
+index 0ceb4f2..0000000
+--- a/debian/masscan.manpages
++++ /dev/null
+@@ -1 +0,0 @@
+-doc/masscan.8
+diff --git a/debian/rules b/debian/rules
+deleted file mode 100755
+index ec6a012..0000000
+--- a/debian/rules
++++ /dev/null
+@@ -1,16 +0,0 @@
+-#!/usr/bin/make -f
+-# -*- makefile -*-
+-# Sample debian/rules that uses debhelper.
+-# This file was originally written by Joey Hess and Craig Small.
+-# As a special exception, when this file is copied by dh-make into a
+-# dh-make output file, you may use that output file without restriction.
+-# This special exception was added by Craig Small in version 0.37 of dh-make.
+-
+-# Uncomment this to turn on verbose mode.
+-#export DH_VERBOSE=1
+-
+-%:
+-	dh $@ 
+-
+-override_dh_auto_test:
+-	$(MAKE) regress
+diff --git a/debian/source/format b/debian/source/format
+deleted file mode 100644
+index 163aaf8..0000000
+--- a/debian/source/format
++++ /dev/null
+@@ -1 +0,0 @@
+-3.0 (quilt)
+diff --git a/debian/watch b/debian/watch
+deleted file mode 100644
+index 2f23b94..0000000
+--- a/debian/watch
++++ /dev/null
+@@ -1,4 +0,0 @@
+-version=3
+-
+-# use the github release pages
+-https://github.com/robertdavidgraham/masscan/releases .*/(\d\S*)\.(?:tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
+diff --git a/tmp/.gitignore b/tmp/.gitignore
+deleted file mode 100644
+index bf1f8a9..0000000
+--- a/tmp/.gitignore
++++ /dev/null
+@@ -1,4 +0,0 @@
+-*
+-!.gitignore
+-
+-
+diff --git a/vs10/.gitignore b/vs10/.gitignore
+deleted file mode 100644
+index 6e3f82f..0000000
+--- a/vs10/.gitignore
++++ /dev/null
+@@ -1,9 +0,0 @@
+-masscan.opensdf
+-masscan.suo
+-tmp/Debug
+-tmp/Release
+-masscan.sdf
+-masscan.vcxproj.user
+-tmp
+-ipch
+-
+diff --git a/vs10/masscan.sln b/vs10/masscan.sln
+deleted file mode 100644
+index 01d609a..0000000
+--- a/vs10/masscan.sln
++++ /dev/null
+@@ -1,26 +0,0 @@
+-﻿
+-Microsoft Visual Studio Solution File, Format Version 11.00
+-# Visual Studio 2010
+-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "masscan", "masscan.vcxproj", "{C88D7583-254F-4BE6-A9B9-89A5BB52E679}"
+-EndProject
+-Global
+-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+-		Debug|Win32 = Debug|Win32
+-		Debug|x64 = Debug|x64
+-		Release|Win32 = Release|Win32
+-		Release|x64 = Release|x64
+-	EndGlobalSection
+-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Debug|Win32.ActiveCfg = Debug|Win32
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Debug|Win32.Build.0 = Debug|Win32
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Debug|x64.ActiveCfg = Debug|x64
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Debug|x64.Build.0 = Debug|x64
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Release|Win32.ActiveCfg = Release|Win32
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Release|Win32.Build.0 = Release|Win32
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Release|x64.ActiveCfg = Release|x64
+-		{C88D7583-254F-4BE6-A9B9-89A5BB52E679}.Release|x64.Build.0 = Release|x64
+-	EndGlobalSection
+-	GlobalSection(SolutionProperties) = preSolution
+-		HideSolutionNode = FALSE
+-	EndGlobalSection
+-EndGlobal
+diff --git a/vs10/masscan.vcxproj b/vs10/masscan.vcxproj
+deleted file mode 100644
+index 1efa9e0..0000000
+--- a/vs10/masscan.vcxproj
++++ /dev/null
+@@ -1,380 +0,0 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup Label="ProjectConfigurations">
+-    <ProjectConfiguration Include="Debug|Win32">
+-      <Configuration>Debug</Configuration>
+-      <Platform>Win32</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Debug|x64">
+-      <Configuration>Debug</Configuration>
+-      <Platform>x64</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Release|Win32">
+-      <Configuration>Release</Configuration>
+-      <Platform>Win32</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Release|x64">
+-      <Configuration>Release</Configuration>
+-      <Platform>x64</Platform>
+-    </ProjectConfiguration>
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClCompile Include="..\src\crypto-base64.c" />
+-    <ClCompile Include="..\src\crypto-blackrock2.c" />
+-    <ClCompile Include="..\src\event-timeout.c" />
+-    <ClCompile Include="..\src\in-filter.c" />
+-    <ClCompile Include="..\src\in-report.c" />
+-    <ClCompile Include="..\src\main-listscan.c" />
+-    <ClCompile Include="..\src\main-ptrace.c" />
+-    <ClCompile Include="..\src\main-readrange.c" />
+-    <ClCompile Include="..\src\in-binary.c" />
+-    <ClCompile Include="..\src\masscan-app.c" />
+-    <ClCompile Include="..\src\massip-addr.c" />
+-    <ClCompile Include="..\src\massip-parse.c" />
+-    <ClCompile Include="..\src\massip-rangesv4.c" />
+-    <ClCompile Include="..\src\massip-rangesv6.c" />
+-    <ClCompile Include="..\src\massip.c" />
+-    <ClCompile Include="..\src\misc-rstfilter.c" />
+-    <ClCompile Include="..\src\out-binary.c" />
+-    <ClCompile Include="..\src\out-certs.c" />
+-    <ClCompile Include="..\src\out-grepable.c" />
+-    <ClCompile Include="..\src\out-hostonly.c" />
+-    <ClCompile Include="..\src\out-json.c" />
+-    <ClCompile Include="..\src\out-ndjson.c" />
+-    <ClCompile Include="..\src\out-null.c" />
+-    <ClCompile Include="..\src\out-redis.c" />
+-    <ClCompile Include="..\src\out-tcp-services.c" />
+-    <ClCompile Include="..\src\out-text.c" />
+-    <ClCompile Include="..\src\out-unicornscan.c" />
+-    <ClCompile Include="..\src\out-xml.c" />
+-    <ClCompile Include="..\src\pixie-backtrace.c" />
+-    <ClCompile Include="..\src\pixie-file.c" />
+-    <ClCompile Include="..\src\proto-arp.c" />
+-    <ClCompile Include="..\src\proto-banner1.c" />
+-    <ClCompile Include="..\src\proto-banout.c" />
+-    <ClCompile Include="..\src\proto-coap.c" />
+-    <ClCompile Include="..\src\proto-dns.c" />
+-    <ClCompile Include="..\src\proto-ftp.c" />
+-    <ClCompile Include="..\src\proto-http.c" />
+-    <ClCompile Include="..\src\proto-icmp.c" />
+-    <ClCompile Include="..\src\proto-imap4.c" />
+-    <ClCompile Include="..\src\proto-interactive.c" />
+-    <ClCompile Include="..\src\proto-memcached.c" />
+-    <ClCompile Include="..\src\proto-netbios.c" />
+-    <ClCompile Include="..\src\proto-ntlmssp.c" />
+-    <ClCompile Include="..\src\proto-ntp.c" />
+-    <ClCompile Include="..\src\proto-oproto.c" />
+-    <ClCompile Include="..\src\proto-pop3.c" />
+-    <ClCompile Include="..\src\proto-sctp.c" />
+-    <ClCompile Include="..\src\proto-smb.c" />
+-    <ClCompile Include="..\src\proto-smtp.c" />
+-    <ClCompile Include="..\src\proto-snmp.c" />
+-    <ClCompile Include="..\src\proto-ssh.c" />
+-    <ClCompile Include="..\src\proto-ssl-test.c" />
+-    <ClCompile Include="..\src\proto-ssl.c" />
+-    <ClCompile Include="..\src\proto-tcp-rdp.c" />
+-    <ClCompile Include="..\src\proto-tcp.c" />
+-    <ClCompile Include="..\src\logger.c" />
+-    <ClCompile Include="..\src\main-conf.c" />
+-    <ClCompile Include="..\src\main-dedup.c" />
+-    <ClCompile Include="..\src\main-initadapter.c" />
+-    <ClCompile Include="..\src\main-status.c" />
+-    <ClCompile Include="..\src\main-throttle.c" />
+-    <ClCompile Include="..\src\main.c" />
+-    <ClCompile Include="..\src\output.c" />
+-    <ClCompile Include="..\src\pixie-threads.c" />
+-    <ClCompile Include="..\src\pixie-timer.c" />
+-    <ClCompile Include="..\src\proto-preprocess.c" />
+-    <ClCompile Include="..\src\proto-tcp-telnet.c" />
+-    <ClCompile Include="..\src\proto-udp.c" />
+-    <ClCompile Include="..\src\proto-vnc.c" />
+-    <ClCompile Include="..\src\proto-x509.c" />
+-    <ClCompile Include="..\src\proto-zeroaccess.c" />
+-    <ClCompile Include="..\src\rand-blackrock.c" />
+-    <ClCompile Include="..\src\rand-lcg.c" />
+-    <ClCompile Include="..\src\rand-primegen.c" />
+-    <ClCompile Include="..\src\rawsock-getif.c" />
+-    <ClCompile Include="..\src\rawsock-getip.c" />
+-    <ClCompile Include="..\src\rawsock-getip6.c" />
+-    <ClCompile Include="..\src\rawsock-getmac.c" />
+-    <ClCompile Include="..\src\rawsock-getroute.c" />
+-    <ClCompile Include="..\src\rawsock-pcapfile.c" />
+-    <ClCompile Include="..\src\rawsock.c" />
+-    <ClCompile Include="..\src\read-service-probes.c" />
+-    <ClCompile Include="..\src\rte-ring.c" />
+-    <ClCompile Include="..\src\scripting-banner.c" />
+-    <ClCompile Include="..\src\scripting-masscan.c" />
+-    <ClCompile Include="..\src\scripting.c" />
+-    <ClCompile Include="..\src\siphash24.c" />
+-    <ClCompile Include="..\src\smack1.c" />
+-    <ClCompile Include="..\src\smackqueue.c" />
+-    <ClCompile Include="..\src\stack-arpv4.c" />
+-    <ClCompile Include="..\src\stack-if.c" />
+-    <ClCompile Include="..\src\stack-ndpv6.c" />
+-    <ClCompile Include="..\src\stack-queue.c" />
+-    <ClCompile Include="..\src\stack-src.c" />
+-    <ClCompile Include="..\src\string_s.c" />
+-    <ClCompile Include="..\src\stub-lua.c" />
+-    <ClCompile Include="..\src\stub-pcap.c" />
+-    <ClCompile Include="..\src\stub-pfring.c" />
+-    <ClCompile Include="..\src\syn-cookie.c" />
+-    <ClCompile Include="..\src\templ-payloads.c" />
+-    <ClCompile Include="..\src\templ-pkt.c" />
+-    <ClCompile Include="..\src\util-checksum.c" />
+-    <ClCompile Include="..\src\util-malloc.c" />
+-    <ClCompile Include="..\src\versioning.c" />
+-    <ClCompile Include="..\src\vulncheck-heartbleed.c" />
+-    <ClCompile Include="..\src\vulncheck-ntp-monlist.c" />
+-    <ClCompile Include="..\src\vulncheck-sslv3.c" />
+-    <ClCompile Include="..\src\vulncheck.c" />
+-    <ClCompile Include="..\src\xring.c" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClInclude Include="..\src\crypto-base64.h" />
+-    <ClInclude Include="..\src\in-filter.h" />
+-    <ClInclude Include="..\src\in-report.h" />
+-    <ClInclude Include="..\src\main-globals.h" />
+-    <ClInclude Include="..\src\event-timeout.h" />
+-    <ClInclude Include="..\src\in-binary.h" />
+-    <ClInclude Include="..\src\logger.h" />
+-    <ClInclude Include="..\src\main-dedup.h" />
+-    <ClInclude Include="..\src\main-ptrace.h" />
+-    <ClInclude Include="..\src\main-readrange.h" />
+-    <ClInclude Include="..\src\main-status.h" />
+-    <ClInclude Include="..\src\main-throttle.h" />
+-    <ClInclude Include="..\src\masscan-app.h" />
+-    <ClInclude Include="..\src\masscan-version.h" />
+-    <ClInclude Include="..\src\masscan.h" />
+-    <ClInclude Include="..\src\massip-addr.h" />
+-    <ClInclude Include="..\src\massip-parse.h" />
+-    <ClInclude Include="..\src\massip-rangesv4.h" />
+-    <ClInclude Include="..\src\massip-rangesv6.h" />
+-    <ClInclude Include="..\src\massip.h" />
+-    <ClInclude Include="..\src\misc-rstfilter.h" />
+-    <ClInclude Include="..\src\out-record.h" />
+-    <ClInclude Include="..\src\out-tcp-services.h" />
+-    <ClInclude Include="..\src\output.h" />
+-    <ClInclude Include="..\src\packet-queue.h" />
+-    <ClInclude Include="..\src\pixie-backtrace.h" />
+-    <ClInclude Include="..\src\pixie-file.h" />
+-    <ClInclude Include="..\src\pixie-sockets.h" />
+-    <ClInclude Include="..\src\pixie-threads.h" />
+-    <ClInclude Include="..\src\pixie-timer.h" />
+-    <ClInclude Include="..\src\proto-arp.h" />
+-    <ClInclude Include="..\src\proto-banner1.h" />
+-    <ClInclude Include="..\src\proto-banout.h" />
+-    <ClInclude Include="..\src\proto-coap.h" />
+-    <ClInclude Include="..\src\proto-dns-parse.h" />
+-    <ClInclude Include="..\src\proto-dns.h" />
+-    <ClInclude Include="..\src\proto-ftp.h" />
+-    <ClInclude Include="..\src\proto-http.h" />
+-    <ClInclude Include="..\src\proto-icmp.h" />
+-    <ClInclude Include="..\src\proto-imap4.h" />
+-    <ClInclude Include="..\src\proto-interactive.h" />
+-    <ClInclude Include="..\src\proto-memcached.h" />
+-    <ClInclude Include="..\src\proto-netbios.h" />
+-    <ClInclude Include="..\src\proto-ntlmssp.h" />
+-    <ClInclude Include="..\src\proto-ntp.h" />
+-    <ClInclude Include="..\src\proto-oproto.h" />
+-    <ClInclude Include="..\src\proto-pop3.h" />
+-    <ClInclude Include="..\src\proto-preprocess.h" />
+-    <ClInclude Include="..\src\proto-sctp.h" />
+-    <ClInclude Include="..\src\proto-smb.h" />
+-    <ClInclude Include="..\src\proto-smtp.h" />
+-    <ClInclude Include="..\src\proto-snmp.h" />
+-    <ClInclude Include="..\src\proto-ssh.h" />
+-    <ClInclude Include="..\src\proto-ssl.h" />
+-    <ClInclude Include="..\src\proto-tcp-rdp.h" />
+-    <ClInclude Include="..\src\proto-tcp.h" />
+-    <ClInclude Include="..\src\proto-tcp-telnet.h" />
+-    <ClInclude Include="..\src\proto-udp.h" />
+-    <ClInclude Include="..\src\proto-vnc.h" />
+-    <ClInclude Include="..\src\proto-x509.h" />
+-    <ClInclude Include="..\src\proto-zeroaccess.h" />
+-    <ClInclude Include="..\src\rand-blackrock.h" />
+-    <ClInclude Include="..\src\rand-lcg.h" />
+-    <ClInclude Include="..\src\rand-primegen.h" />
+-    <ClInclude Include="..\src\rawsock-adapter.h" />
+-    <ClInclude Include="..\src\rawsock-pcapfile.h" />
+-    <ClInclude Include="..\src\rawsock.h" />
+-    <ClInclude Include="..\src\read-service-probes.h" />
+-    <ClInclude Include="..\src\rte-ring.h" />
+-    <ClInclude Include="..\src\scripting.h" />
+-    <ClInclude Include="..\src\siphash24.h" />
+-    <ClInclude Include="..\src\smack.h" />
+-    <ClInclude Include="..\src\smackqueue.h" />
+-    <ClInclude Include="..\src\stack-arpv4.h" />
+-    <ClInclude Include="..\src\stack-ndpv6.h" />
+-    <ClInclude Include="..\src\stack-queue.h" />
+-    <ClInclude Include="..\src\stack-src.h" />
+-    <ClInclude Include="..\src\string_s.h" />
+-    <ClInclude Include="..\src\stub-lua.h" />
+-    <ClInclude Include="..\src\stub-pcap.h" />
+-    <ClInclude Include="..\src\stub-pfring.h" />
+-    <ClInclude Include="..\src\syn-cookie.h" />
+-    <ClInclude Include="..\src\templ-payloads.h" />
+-    <ClInclude Include="..\src\templ-pkt.h" />
+-    <ClInclude Include="..\src\util-bool.h" />
+-    <ClInclude Include="..\src\util-checksum.h" />
+-    <ClInclude Include="..\src\util-malloc.h" />
+-    <ClInclude Include="..\src\versioning.h" />
+-    <ClInclude Include="..\src\vulncheck.h" />
+-    <ClInclude Include="..\src\xring.h" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <None Include="..\doc\masscan.8.markdown" />
+-    <None Include="..\LICENSE" />
+-    <None Include="..\Makefile" />
+-    <None Include="..\README.md" />
+-    <None Include="..\VULNINFO.md" />
+-  </ItemGroup>
+-  <PropertyGroup Label="Globals">
+-    <ProjectGuid>{C88D7583-254F-4BE6-A9B9-89A5BB52E679}</ProjectGuid>
+-    <Keyword>Win32Proj</Keyword>
+-    <RootNamespace>masscan</RootNamespace>
+-  </PropertyGroup>
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+-    <ConfigurationType>Application</ConfigurationType>
+-    <UseDebugLibraries>true</UseDebugLibraries>
+-    <CharacterSet>Unicode</CharacterSet>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+-    <ConfigurationType>Application</ConfigurationType>
+-    <UseDebugLibraries>true</UseDebugLibraries>
+-    <CharacterSet>Unicode</CharacterSet>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+-    <ConfigurationType>Application</ConfigurationType>
+-    <UseDebugLibraries>false</UseDebugLibraries>
+-    <WholeProgramOptimization>true</WholeProgramOptimization>
+-    <CharacterSet>Unicode</CharacterSet>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+-    <ConfigurationType>Application</ConfigurationType>
+-    <UseDebugLibraries>false</UseDebugLibraries>
+-    <WholeProgramOptimization>true</WholeProgramOptimization>
+-    <CharacterSet>Unicode</CharacterSet>
+-  </PropertyGroup>
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+-  <ImportGroup Label="ExtensionSettings">
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <PropertyGroup Label="UserMacros" />
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <LinkIncremental>true</LinkIncremental>
+-    <IntDir>$(SolutionDir)\..\tmp\$(Configuration)\</IntDir>
+-    <OutDir>$(SolutionDir)\..\bin\</OutDir>
+-    <RunCodeAnalysis>false</RunCodeAnalysis>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <LinkIncremental>true</LinkIncremental>
+-    <IntDir>$(SolutionDir)\..\tmp\</IntDir>
+-    <OutDir>$(SolutionDir)\..\bin\</OutDir>
+-    <RunCodeAnalysis>false</RunCodeAnalysis>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <LinkIncremental>false</LinkIncremental>
+-    <OutDir>$(SolutionDir)\..\bin\</OutDir>
+-    <IntDir>$(SolutionDir)\..\tmp\$(Configuration)\</IntDir>
+-  </PropertyGroup>
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <LinkIncremental>false</LinkIncremental>
+-    <OutDir>$(SolutionDir)\..\bin\</OutDir>
+-    <IntDir>$(SolutionDir)\..\tmp\$(Configuration)\</IntDir>
+-  </PropertyGroup>
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <ClCompile>
+-      <PrecompiledHeader>
+-      </PrecompiledHeader>
+-      <WarningLevel>Level4</WarningLevel>
+-      <Optimization>Disabled</Optimization>
+-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-      <EnablePREfast>false</EnablePREfast>
+-      <WholeProgramOptimization>false</WholeProgramOptimization>
+-    </ClCompile>
+-    <Link>
+-      <SubSystem>Console</SubSystem>
+-      <GenerateDebugInformation>true</GenerateDebugInformation>
+-      <AdditionalLibraryDirectories>lib;</AdditionalLibraryDirectories>
+-      <Profile>true</Profile>
+-    </Link>
+-  </ItemDefinitionGroup>
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <ClCompile>
+-      <PrecompiledHeader>
+-      </PrecompiledHeader>
+-      <WarningLevel>Level4</WarningLevel>
+-      <Optimization>Disabled</Optimization>
+-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-      <EnablePREfast>false</EnablePREfast>
+-    </ClCompile>
+-    <Link>
+-      <SubSystem>Console</SubSystem>
+-      <GenerateDebugInformation>true</GenerateDebugInformation>
+-      <AdditionalLibraryDirectories>lib\x64;</AdditionalLibraryDirectories>
+-      <AdditionalDependencies>setargv.obj;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+-      <Profile>true</Profile>
+-    </Link>
+-  </ItemDefinitionGroup>
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <PrecompiledHeader>
+-      </PrecompiledHeader>
+-      <Optimization>MaxSpeed</Optimization>
+-      <FunctionLevelLinking>true</FunctionLevelLinking>
+-      <IntrinsicFunctions>true</IntrinsicFunctions>
+-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>include</AdditionalIncludeDirectories>
+-    </ClCompile>
+-    <Link>
+-      <SubSystem>Console</SubSystem>
+-      <GenerateDebugInformation>true</GenerateDebugInformation>
+-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+-      <OptimizeReferences>true</OptimizeReferences>
+-      <AdditionalLibraryDirectories>lib</AdditionalLibraryDirectories>
+-    </Link>
+-    <BuildLog>
+-      <Path>$(IntDir)\$(MSBuildProjectName).log</Path>
+-    </BuildLog>
+-  </ItemDefinitionGroup>
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <PrecompiledHeader>
+-      </PrecompiledHeader>
+-      <Optimization>MaxSpeed</Optimization>
+-      <FunctionLevelLinking>true</FunctionLevelLinking>
+-      <IntrinsicFunctions>true</IntrinsicFunctions>
+-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>include</AdditionalIncludeDirectories>
+-    </ClCompile>
+-    <Link>
+-      <SubSystem>Console</SubSystem>
+-      <GenerateDebugInformation>true</GenerateDebugInformation>
+-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+-      <OptimizeReferences>true</OptimizeReferences>
+-      <AdditionalLibraryDirectories>lib\x64</AdditionalLibraryDirectories>
+-    </Link>
+-    <BuildLog>
+-      <Path>$(IntDir)\$(MSBuildProjectName).log</Path>
+-    </BuildLog>
+-  </ItemDefinitionGroup>
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+-  <ImportGroup Label="ExtensionTargets">
+-  </ImportGroup>
+-</Project>
+\ No newline at end of file
+diff --git a/vs10/masscan.vcxproj.filters b/vs10/masscan.vcxproj.filters
+deleted file mode 100644
+index bf747f5..0000000
+--- a/vs10/masscan.vcxproj.filters
++++ /dev/null
+@@ -1,672 +0,0 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup>
+-    <Filter Include="Source Files">
+-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+-    </Filter>
+-    <Filter Include="Header Files">
+-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+-      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+-    </Filter>
+-    <Filter Include="Resource Files">
+-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+-    </Filter>
+-    <Filter Include="Source Files\proto">
+-      <UniqueIdentifier>{fc470d2b-e741-496b-be6e-abf15f4e3573}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\output">
+-      <UniqueIdentifier>{3fbe0a31-7af3-4f28-a707-85577ab7be71}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\rawsock">
+-      <UniqueIdentifier>{8ca96e86-20f2-45b3-b1c4-ee9d90f5c6d8}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\misc">
+-      <UniqueIdentifier>{d429351b-2aea-4e6c-a887-c7fb9d6c38b5}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\pixie">
+-      <UniqueIdentifier>{cbd42363-ae71-4e2d-9633-0cb518d5e447}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\crypto">
+-      <UniqueIdentifier>{59f7bc00-cf14-4114-8801-1c5e72255c29}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\stubs">
+-      <UniqueIdentifier>{a481491e-ed05-4aeb-a49a-d8f071dc1409}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\scripting">
+-      <UniqueIdentifier>{ba03c2ec-de65-4581-bef1-8e24f95a8580}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\versioning">
+-      <UniqueIdentifier>{09e28aca-e0bd-47a9-b983-5c9f38392d20}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\vulncheck">
+-      <UniqueIdentifier>{8ad0f675-466a-4fb9-bac6-6fa0c868aefb}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\massip">
+-      <UniqueIdentifier>{1621e340-1943-47fa-b12e-336a46d19b15}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\util">
+-      <UniqueIdentifier>{1d9cb2b4-1715-44d0-98e9-745f236c7872}</UniqueIdentifier>
+-    </Filter>
+-    <Filter Include="Source Files\stack">
+-      <UniqueIdentifier>{26588af1-2234-4000-96fc-72f774f584f8}</UniqueIdentifier>
+-    </Filter>
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClCompile Include="..\src\proto-banner1.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-dns.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-http.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-icmp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-preprocess.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-snmp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ssh.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-tcp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-udp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-netbios.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\templ-payloads.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\templ-pkt.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-binary.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-null.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-text.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-xml.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\output.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-arp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-getif.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-getip.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-getmac.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-getroute.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-pcapfile.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\event-timeout.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\logger.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-dedup.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-initadapter.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-listscan.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-ptrace.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-throttle.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rte-ring.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\string_s.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\xring.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main.c">
+-      <Filter>Source Files</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ssl.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rand-blackrock.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rand-lcg.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rand-primegen.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\smack1.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\smackqueue.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\syn-cookie.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\siphash24.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\in-binary.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-redis.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\masscan-app.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-conf.c">
+-      <Filter>Source Files</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-zeroaccess.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ssl-test.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-banout.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-x509.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\crypto-base64.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\pixie-backtrace.c">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\pixie-file.c">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\pixie-threads.c">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\pixie-timer.c">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-tcp-telnet.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-sctp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-grepable.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ntp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-status.c">
+-      <Filter>Source Files</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\main-readrange.c">
+-      <Filter>Source Files</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\crypto-blackrock2.c">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-json.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-certs.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-unicornscan.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ftp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-imap4.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-pop3.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-smtp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-vnc.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-interactive.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\in-filter.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\in-report.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-ndjson.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-memcached.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-smb.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-ntlmssp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-tcp-services.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\scripting.c">
+-      <Filter>Source Files\scripting</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\scripting-banner.c">
+-      <Filter>Source Files\scripting</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\scripting-masscan.c">
+-      <Filter>Source Files\scripting</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stub-lua.c">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stub-pcap.c">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stub-pfring.c">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\versioning.c">
+-      <Filter>Source Files\versioning</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\vulncheck.c">
+-      <Filter>Source Files\vulncheck</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\vulncheck-heartbleed.c">
+-      <Filter>Source Files\vulncheck</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\vulncheck-ntp-monlist.c">
+-      <Filter>Source Files\vulncheck</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\vulncheck-sslv3.c">
+-      <Filter>Source Files\vulncheck</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\read-service-probes.c">
+-      <Filter>Source Files\versioning</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-coap.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-tcp-rdp.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\proto-oproto.c">
+-      <Filter>Source Files\proto</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\misc-rstfilter.c">
+-      <Filter>Source Files\misc</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\rawsock-getip6.c">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\util-checksum.c">
+-      <Filter>Source Files\util</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\util-malloc.c">
+-      <Filter>Source Files\util</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stack-src.c">
+-      <Filter>Source Files\stack</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stack-ndpv6.c">
+-      <Filter>Source Files\stack</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stack-queue.c">
+-      <Filter>Source Files\stack</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\massip.c">
+-      <Filter>Source Files\massip</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\massip-parse.c">
+-      <Filter>Source Files\massip</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\massip-rangesv4.c">
+-      <Filter>Source Files\massip</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\massip-rangesv6.c">
+-      <Filter>Source Files\massip</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\massip-addr.c">
+-      <Filter>Source Files\massip</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\out-hostonly.c">
+-      <Filter>Source Files\output</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stack-arpv4.c">
+-      <Filter>Source Files\stack</Filter>
+-    </ClCompile>
+-    <ClCompile Include="..\src\stack-if.c">
+-      <Filter>Source Files\stack</Filter>
+-    </ClCompile>
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClInclude Include="..\src\proto-arp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-udp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-banner1.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-dns.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-http.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-icmp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-preprocess.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-snmp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-ssh.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-tcp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-netbios.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-dns-parse.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\templ-pkt.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\templ-payloads.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\output.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\out-record.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rawsock.h">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rawsock-pcapfile.h">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\xring.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\event-timeout.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\logger.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-dedup.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-ptrace.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-throttle.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\packet-queue.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rte-ring.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\string_s.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-ssl.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\masscan.h">
+-      <Filter>Source Files</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rand-primegen.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rand-blackrock.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rand-lcg.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\smack.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\smackqueue.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\syn-cookie.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\siphash24.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\in-binary.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-globals.h">
+-      <Filter>Source Files</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\masscan-app.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-zeroaccess.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-banout.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-x509.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\crypto-base64.h">
+-      <Filter>Source Files\crypto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\pixie-timer.h">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\pixie-backtrace.h">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\pixie-file.h">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\pixie-sockets.h">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\pixie-threads.h">
+-      <Filter>Source Files\pixie</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-tcp-telnet.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-sctp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\masscan-version.h">
+-      <Filter>Source Files</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-ntp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-status.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\main-readrange.h">
+-      <Filter>Source Files</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-interactive.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-ftp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-imap4.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-pop3.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-smtp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-vnc.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\in-filter.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\in-report.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-memcached.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-smb.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-ntlmssp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\out-tcp-services.h">
+-      <Filter>Source Files\output</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\scripting.h">
+-      <Filter>Source Files\scripting</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stub-lua.h">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stub-pcap.h">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stub-pfring.h">
+-      <Filter>Source Files\stubs</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\versioning.h">
+-      <Filter>Source Files\versioning</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\vulncheck.h">
+-      <Filter>Source Files\vulncheck</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\read-service-probes.h">
+-      <Filter>Source Files\versioning</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-coap.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\util-bool.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-tcp-rdp.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\proto-oproto.h">
+-      <Filter>Source Files\proto</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\misc-rstfilter.h">
+-      <Filter>Source Files\misc</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\util-checksum.h">
+-      <Filter>Source Files\util</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\util-malloc.h">
+-      <Filter>Source Files\util</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stack-src.h">
+-      <Filter>Source Files\stack</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stack-ndpv6.h">
+-      <Filter>Source Files\stack</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stack-queue.h">
+-      <Filter>Source Files\stack</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\massip.h">
+-      <Filter>Source Files\massip</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\massip-parse.h">
+-      <Filter>Source Files\massip</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\massip-rangesv4.h">
+-      <Filter>Source Files\massip</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\massip-rangesv6.h">
+-      <Filter>Source Files\massip</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\massip-addr.h">
+-      <Filter>Source Files\massip</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\stack-arpv4.h">
+-      <Filter>Source Files\stack</Filter>
+-    </ClInclude>
+-    <ClInclude Include="..\src\rawsock-adapter.h">
+-      <Filter>Source Files\rawsock</Filter>
+-    </ClInclude>
+-  </ItemGroup>
+-  <ItemGroup>
+-    <None Include="..\README.md" />
+-    <None Include="..\LICENSE">
+-      <Filter>Resource Files</Filter>
+-    </None>
+-    <None Include="..\Makefile">
+-      <Filter>Resource Files</Filter>
+-    </None>
+-    <None Include="..\doc\masscan.8.markdown">
+-      <Filter>Resource Files</Filter>
+-    </None>
+-    <None Include="..\VULNINFO.md">
+-      <Filter>Resource Files</Filter>
+-    </None>
+-  </ItemGroup>
+-</Project>
+\ No newline at end of file
+diff --git a/xcode4/.gitignore b/xcode4/.gitignore
+deleted file mode 100644
+index 0fccbd9..0000000
+--- a/xcode4/.gitignore
++++ /dev/null
+@@ -1,2 +0,0 @@
+-.DS_Store
+-build
+diff --git a/xcode4/masscan.xcodeproj/.gitignore b/xcode4/masscan.xcodeproj/.gitignore
+deleted file mode 100644
+index 9142be7..0000000
+--- a/xcode4/masscan.xcodeproj/.gitignore
++++ /dev/null
+@@ -1,3 +0,0 @@
+-project.xcworkspace
+-xcuserdata
+-
+diff --git a/xcode4/masscan.xcodeproj/project.pbxproj b/xcode4/masscan.xcodeproj/project.pbxproj
+deleted file mode 100644
+index 73f2328..0000000
+--- a/xcode4/masscan.xcodeproj/project.pbxproj
++++ /dev/null
+@@ -1,958 +0,0 @@
+-// !$*UTF8*$!
+-{
+-	archiveVersion = 1;
+-	classes = {
+-	};
+-	objectVersion = 46;
+-	objects = {
+-
+-/* Begin PBXBuildFile section */
+-		1107E9B2228DF7BB003384B3 /* proto-tcp-rdp.c in Sources */ = {isa = PBXBuildFile; fileRef = 1107E9B1228DF7BB003384B3 /* proto-tcp-rdp.c */; };
+-		110C79B022833AFA003FAC94 /* proto-oproto.c in Sources */ = {isa = PBXBuildFile; fileRef = 110C79AF22833AF9003FAC94 /* proto-oproto.c */; };
+-		110ED16820CB0BC200690C91 /* proto-ntlmssp.c in Sources */ = {isa = PBXBuildFile; fileRef = 110ED16720CB0BC200690C91 /* proto-ntlmssp.c */; };
+-		11126597197A086B00DC5987 /* out-unicornscan.c in Sources */ = {isa = PBXBuildFile; fileRef = 11126596197A086B00DC5987 /* out-unicornscan.c */; };
+-		1124DD6B25B4FF1600EEFC2C /* out-hostonly.c in Sources */ = {isa = PBXBuildFile; fileRef = 1124DD6A25B4FF1600EEFC2C /* out-hostonly.c */; };
+-		1124DD6F25B4FF3C00EEFC2C /* stack-if.c in Sources */ = {isa = PBXBuildFile; fileRef = 1124DD6C25B4FF3C00EEFC2C /* stack-if.c */; };
+-		1124DD7025B4FF3C00EEFC2C /* stack-arpv4.c in Sources */ = {isa = PBXBuildFile; fileRef = 1124DD6D25B4FF3C00EEFC2C /* stack-arpv4.c */; };
+-		112A871A1F9D8DF200D4D240 /* out-ndjson.c in Sources */ = {isa = PBXBuildFile; fileRef = 112A87191F9D8DF200D4D240 /* out-ndjson.c */; };
+-		11420DD319A2D47A00DB5BFE /* proto-vnc.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DD219A2D47A00DB5BFE /* proto-vnc.c */; };
+-		11420DD819A8160500DB5BFE /* proto-ftp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DD719A8160500DB5BFE /* proto-ftp.c */; };
+-		11420DDB19A84A9F00DB5BFE /* proto-smtp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DDA19A84A9E00DB5BFE /* proto-smtp.c */; };
+-		11420DDE19A8FDE300DB5BFE /* proto-pop3.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DDD19A8FDE300DB5BFE /* proto-pop3.c */; };
+-		11420DE019A90CB300DB5BFE /* proto-interactive.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DDF19A90CB300DB5BFE /* proto-interactive.c */; };
+-		11420DE319A9363B00DB5BFE /* proto-imap4.c in Sources */ = {isa = PBXBuildFile; fileRef = 11420DE219A9363A00DB5BFE /* proto-imap4.c */; };
+-		11469CA22295D80A00FA76BE /* misc-rstfilter.c in Sources */ = {isa = PBXBuildFile; fileRef = 11469CA12295D80A00FA76BE /* misc-rstfilter.c */; };
+-		115C0CAB18035BC5004E6CD7 /* proto-netbios.c in Sources */ = {isa = PBXBuildFile; fileRef = 115C0CA518035BC5004E6CD7 /* proto-netbios.c */; };
+-		115C0CAC18035BC5004E6CD7 /* proto-ssl.c in Sources */ = {isa = PBXBuildFile; fileRef = 115C0CA718035BC5004E6CD7 /* proto-ssl.c */; };
+-		11623F6A191E0DB00075EEE6 /* out-certs.c in Sources */ = {isa = PBXBuildFile; fileRef = 11623F69191E0DB00075EEE6 /* out-certs.c */; };
+-		118B9B3225A00FA900F5FB0B /* massip-rangesv4.c in Sources */ = {isa = PBXBuildFile; fileRef = 118B9B2B25A00FA800F5FB0B /* massip-rangesv4.c */; };
+-		118B9B3325A00FA900F5FB0B /* massip-rangesv6.c in Sources */ = {isa = PBXBuildFile; fileRef = 118B9B2C25A00FA800F5FB0B /* massip-rangesv6.c */; };
+-		118B9B3425A00FA900F5FB0B /* massip-parse.c in Sources */ = {isa = PBXBuildFile; fileRef = 118B9B2F25A00FA900F5FB0B /* massip-parse.c */; };
+-		118B9B3525A00FA900F5FB0B /* massip.c in Sources */ = {isa = PBXBuildFile; fileRef = 118B9B3125A00FA900F5FB0B /* massip.c */; };
+-		118E115725859D5300618314 /* util-checksum.c in Sources */ = {isa = PBXBuildFile; fileRef = 118E115525859D5300618314 /* util-checksum.c */; };
+-		118E115925859E6F00618314 /* rawsock-getip6.c in Sources */ = {isa = PBXBuildFile; fileRef = 118E115825859E6F00618314 /* rawsock-getip6.c */; };
+-		119968FC21388A3C00E82767 /* read-service-probes.c in Sources */ = {isa = PBXBuildFile; fileRef = 119968FB21388A3B00E82767 /* read-service-probes.c */; };
+-		119969002141AB3600E82767 /* stub-pfring.c in Sources */ = {isa = PBXBuildFile; fileRef = 119968FE2141AB3600E82767 /* stub-pfring.c */; };
+-		119969012141AB3600E82767 /* stub-pcap.c in Sources */ = {isa = PBXBuildFile; fileRef = 119968FF2141AB3600E82767 /* stub-pcap.c */; };
+-		119AB2062051FFED008E4DDD /* proto-memcached.c in Sources */ = {isa = PBXBuildFile; fileRef = 119AB2042051FFED008E4DDD /* proto-memcached.c */; };
+-		11A50CAE191C128F006D5802 /* out-json.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A50CAD191C128F006D5802 /* out-json.c */; };
+-		11A773EB1881BFC700B135DE /* crypto-base64.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A773E91881BFC700B135DE /* crypto-base64.c */; };
+-		11A868151816F3A7008E00B8 /* in-binary.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A868081816F3A7008E00B8 /* in-binary.c */; };
+-		11A868161816F3A7008E00B8 /* stack-src.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A8680B1816F3A7008E00B8 /* stack-src.c */; };
+-		11A868171816F3A7008E00B8 /* masscan-app.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A8680D1816F3A7008E00B8 /* masscan-app.c */; };
+-		11A868181816F3A7008E00B8 /* out-redis.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A8680F1816F3A7008E00B8 /* out-redis.c */; };
+-		11A868191816F3A7008E00B8 /* pixie-file.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A868101816F3A7008E00B8 /* pixie-file.c */; };
+-		11A8681A1816F3A7008E00B8 /* siphash24.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A868131816F3A7008E00B8 /* siphash24.c */; };
+-		11A8681E1819A6F7008E00B8 /* proto-zeroaccess.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A8681C1819A6F7008E00B8 /* proto-zeroaccess.c */; };
+-		11A921D517DBCC7E00DDFD32 /* event-timeout.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219317DBCC7E00DDFD32 /* event-timeout.c */; };
+-		11A921D617DBCC7E00DDFD32 /* logger.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219517DBCC7E00DDFD32 /* logger.c */; };
+-		11A921D717DBCC7E00DDFD32 /* main-conf.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219717DBCC7E00DDFD32 /* main-conf.c */; };
+-		11A921D817DBCC7E00DDFD32 /* main-dedup.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219817DBCC7E00DDFD32 /* main-dedup.c */; };
+-		11A921D917DBCC7E00DDFD32 /* main-initadapter.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219A17DBCC7E00DDFD32 /* main-initadapter.c */; };
+-		11A921DA17DBCC7E00DDFD32 /* main-status.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219B17DBCC7E00DDFD32 /* main-status.c */; };
+-		11A921DB17DBCC7E00DDFD32 /* main-throttle.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219D17DBCC7E00DDFD32 /* main-throttle.c */; };
+-		11A921DC17DBCC7E00DDFD32 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A9219F17DBCC7E00DDFD32 /* main.c */; };
+-		11A921DD17DBCC7E00DDFD32 /* out-binary.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A117DBCC7E00DDFD32 /* out-binary.c */; };
+-		11A921DE17DBCC7E00DDFD32 /* out-null.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A217DBCC7E00DDFD32 /* out-null.c */; };
+-		11A921DF17DBCC7E00DDFD32 /* out-text.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A317DBCC7E00DDFD32 /* out-text.c */; };
+-		11A921E017DBCC7E00DDFD32 /* out-xml.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A417DBCC7E00DDFD32 /* out-xml.c */; };
+-		11A921E117DBCC7E00DDFD32 /* output.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A517DBCC7E00DDFD32 /* output.c */; };
+-		11A921E217DBCC7E00DDFD32 /* pixie-threads.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921A817DBCC7E00DDFD32 /* pixie-threads.c */; };
+-		11A921E317DBCC7E00DDFD32 /* pixie-timer.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921AA17DBCC7E00DDFD32 /* pixie-timer.c */; };
+-		11A921E417DBCC7E00DDFD32 /* proto-arp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921AC17DBCC7E00DDFD32 /* proto-arp.c */; };
+-		11A921E517DBCC7E00DDFD32 /* proto-banner1.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921AE17DBCC7E00DDFD32 /* proto-banner1.c */; };
+-		11A921E617DBCC7E00DDFD32 /* proto-preprocess.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921B017DBCC7E00DDFD32 /* proto-preprocess.c */; };
+-		11A921E717DBCC7E00DDFD32 /* proto-tcp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921B217DBCC7E00DDFD32 /* proto-tcp.c */; };
+-		11A921E817DBCC7E00DDFD32 /* rand-blackrock.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921B417DBCC7E00DDFD32 /* rand-blackrock.c */; };
+-		11A921E917DBCC7E00DDFD32 /* rand-lcg.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921B617DBCC7E00DDFD32 /* rand-lcg.c */; };
+-		11A921EA17DBCC7E00DDFD32 /* rand-primegen.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921B817DBCC7E00DDFD32 /* rand-primegen.c */; };
+-		11A921ED17DBCC7E00DDFD32 /* rawsock-getif.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921BD17DBCC7E00DDFD32 /* rawsock-getif.c */; };
+-		11A921EE17DBCC7E00DDFD32 /* rawsock-getip.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921BE17DBCC7E00DDFD32 /* rawsock-getip.c */; };
+-		11A921EF17DBCC7E00DDFD32 /* rawsock-getmac.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921BF17DBCC7E00DDFD32 /* rawsock-getmac.c */; };
+-		11A921F017DBCC7E00DDFD32 /* rawsock-getroute.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921C017DBCC7E00DDFD32 /* rawsock-getroute.c */; };
+-		11A921F117DBCC7E00DDFD32 /* rawsock-pcapfile.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921C117DBCC7E00DDFD32 /* rawsock-pcapfile.c */; };
+-		11A921F317DBCC7E00DDFD32 /* rawsock.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921C517DBCC7E00DDFD32 /* rawsock.c */; };
+-		11A921F417DBCC7E00DDFD32 /* rte-ring.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921C717DBCC7E00DDFD32 /* rte-ring.c */; };
+-		11A921F517DBCC7E00DDFD32 /* smack1.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921CA17DBCC7E00DDFD32 /* smack1.c */; };
+-		11A921F617DBCC7E00DDFD32 /* smackqueue.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921CB17DBCC7E00DDFD32 /* smackqueue.c */; };
+-		11A921F717DBCC7E00DDFD32 /* string_s.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921CD17DBCC7E00DDFD32 /* string_s.c */; };
+-		11A921F817DBCC7E00DDFD32 /* syn-cookie.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921CF17DBCC7E00DDFD32 /* syn-cookie.c */; };
+-		11A921F917DBCC7E00DDFD32 /* templ-pkt.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921D117DBCC7E00DDFD32 /* templ-pkt.c */; };
+-		11A921FA17DBCC7E00DDFD32 /* xring.c in Sources */ = {isa = PBXBuildFile; fileRef = 11A921D317DBCC7E00DDFD32 /* xring.c */; };
+-		11AC2F9B188CE34A008CB623 /* proto-sctp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11AC2F99188CE34A008CB623 /* proto-sctp.c */; };
+-		11AC80ED17E0DAD4001BCE3A /* proto-http.c in Sources */ = {isa = PBXBuildFile; fileRef = 11AC80E717E0DAD4001BCE3A /* proto-http.c */; };
+-		11AC80EE17E0DAD4001BCE3A /* proto-icmp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11AC80E917E0DAD4001BCE3A /* proto-icmp.c */; };
+-		11AC80EF17E0DAD4001BCE3A /* proto-ssh.c in Sources */ = {isa = PBXBuildFile; fileRef = 11AC80EB17E0DAD4001BCE3A /* proto-ssh.c */; };
+-		11AC80F617E0ED47001BCE3A /* main-ptrace.c in Sources */ = {isa = PBXBuildFile; fileRef = 11AC80F517E0ED47001BCE3A /* main-ptrace.c */; };
+-		11B039C117E506B400925E7E /* main-listscan.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B039C017E506B400925E7E /* main-listscan.c */; };
+-		11B039C717E7834000925E7E /* proto-dns.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B039C317E7834000925E7E /* proto-dns.c */; };
+-		11B039C817E7834000925E7E /* proto-udp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B039C517E7834000925E7E /* proto-udp.c */; };
+-		11B039CB17EA092B00925E7E /* proto-snmp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B039C917EA092B00925E7E /* proto-snmp.c */; };
+-		11B05EA618B9649F009C935E /* crypto-blackrock2.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B05EA418B9649F009C935E /* crypto-blackrock2.c */; };
+-		11B05EA718B9649F009C935E /* main-readrange.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B05EA518B9649F009C935E /* main-readrange.c */; };
+-		11B22ED518641DCC00DA5438 /* proto-banout.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B22ED018641DCC00DA5438 /* proto-banout.c */; };
+-		11B22ED618641DCC00DA5438 /* proto-ssl-test.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B22ED218641DCC00DA5438 /* proto-ssl-test.c */; };
+-		11B22ED718641DCC00DA5438 /* proto-x509.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B22ED318641DCC00DA5438 /* proto-x509.c */; };
+-		11B2DD9E17DE4DD8007FC363 /* templ-payloads.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B2DD9C17DE4DD8007FC363 /* templ-payloads.c */; };
+-		11B5897E21C0785C00DD6248 /* util-malloc.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B5897D21C0785B00DD6248 /* util-malloc.c */; };
+-		11B6297925995AA100D4786F /* stack-queue.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B6297525995AA100D4786F /* stack-queue.c */; };
+-		11B6297A25995AA100D4786F /* stack-ndpv6.c in Sources */ = {isa = PBXBuildFile; fileRef = 11B6297625995AA100D4786F /* stack-ndpv6.c */; };
+-		11BA296218902CEE0064A759 /* out-grepable.c in Sources */ = {isa = PBXBuildFile; fileRef = 11BA295F18902CEE0064A759 /* out-grepable.c */; };
+-		11BA296318902CEE0064A759 /* proto-tcp-telnet.c in Sources */ = {isa = PBXBuildFile; fileRef = 11BA296018902CEE0064A759 /* proto-tcp-telnet.c */; };
+-		11BA296B189060220064A759 /* proto-ntp.c in Sources */ = {isa = PBXBuildFile; fileRef = 11BA296A189060220064A759 /* proto-ntp.c */; };
+-		11BE533625A6441100451F95 /* massip-addr.c in Sources */ = {isa = PBXBuildFile; fileRef = 11BE533525A6441100451F95 /* massip-addr.c */; };
+-		11C936C31EDCE77F0023D32E /* in-filter.c in Sources */ = {isa = PBXBuildFile; fileRef = 11C936BF1EDCE77F0023D32E /* in-filter.c */; };
+-		11C936C41EDCE77F0023D32E /* in-report.c in Sources */ = {isa = PBXBuildFile; fileRef = 11C936C11EDCE77F0023D32E /* in-report.c */; };
+-		11D0FAFB22763F4900332FA7 /* proto-coap.c in Sources */ = {isa = PBXBuildFile; fileRef = 11D0FAFA22763F4900332FA7 /* proto-coap.c */; };
+-		11DD363421067BD400CBE1DE /* out-tcp-services.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD363321067BD300CBE1DE /* out-tcp-services.c */; };
+-		11DD36382107DE9700CBE1DE /* stub-lua.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD36362107DE9700CBE1DE /* stub-lua.c */; };
+-		11DD363B2107DFEB00CBE1DE /* scripting.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD363A2107DFEB00CBE1DE /* scripting.c */; };
+-		11DD36412107E7ED00CBE1DE /* vulncheck-heartbleed.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD363C2107E7ED00CBE1DE /* vulncheck-heartbleed.c */; };
+-		11DD36422107E7ED00CBE1DE /* vulncheck-sslv3.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD363D2107E7ED00CBE1DE /* vulncheck-sslv3.c */; };
+-		11DD36432107E7ED00CBE1DE /* vulncheck.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD363F2107E7ED00CBE1DE /* vulncheck.c */; };
+-		11DD36442107E7ED00CBE1DE /* vulncheck-ntp-monlist.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD36402107E7ED00CBE1DE /* vulncheck-ntp-monlist.c */; };
+-		11DD36462107EB8700CBE1DE /* scripting-masscan.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD36452107EB8700CBE1DE /* scripting-masscan.c */; };
+-		11DD36492108DCBB00CBE1DE /* versioning.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD36472108DCBB00CBE1DE /* versioning.c */; };
+-		11DD364B2108E0CB00CBE1DE /* scripting-banner.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DD364A2108E0CB00CBE1DE /* scripting-banner.c */; };
+-		11DE129620ABC2650041135D /* proto-smb.c in Sources */ = {isa = PBXBuildFile; fileRef = 11DE129520ABC2650041135D /* proto-smb.c */; };
+-		11E76DB41889BC5200061F45 /* pixie-backtrace.c in Sources */ = {isa = PBXBuildFile; fileRef = 11E76DB21889BC5200061F45 /* pixie-backtrace.c */; };
+-/* End PBXBuildFile section */
+-
+-/* Begin PBXCopyFilesBuildPhase section */
+-		11A9218317DBCB3200DDFD32 /* CopyFiles */ = {
+-			isa = PBXCopyFilesBuildPhase;
+-			buildActionMask = 2147483647;
+-			dstPath = /usr/share/man/man1/;
+-			dstSubfolderSpec = 0;
+-			files = (
+-			);
+-			runOnlyForDeploymentPostprocessing = 1;
+-		};
+-/* End PBXCopyFilesBuildPhase section */
+-
+-/* Begin PBXFileReference section */
+-		1107E9B0228DF7BB003384B3 /* proto-tcp-rdp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-tcp-rdp.h"; sourceTree = "<group>"; };
+-		1107E9B1228DF7BB003384B3 /* proto-tcp-rdp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-tcp-rdp.c"; sourceTree = "<group>"; };
+-		110C79AE22833AF9003FAC94 /* proto-oproto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-oproto.h"; sourceTree = "<group>"; };
+-		110C79AF22833AF9003FAC94 /* proto-oproto.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-oproto.c"; sourceTree = "<group>"; };
+-		110ED16520CA6A8300690C91 /* proto-spnego.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-spnego.h"; sourceTree = "<group>"; };
+-		110ED16620CB0BC200690C91 /* proto-ntlmssp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-ntlmssp.h"; sourceTree = "<group>"; };
+-		110ED16720CB0BC200690C91 /* proto-ntlmssp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ntlmssp.c"; sourceTree = "<group>"; };
+-		11126596197A086B00DC5987 /* out-unicornscan.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-unicornscan.c"; sourceTree = "<group>"; };
+-		1124DD6A25B4FF1600EEFC2C /* out-hostonly.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-hostonly.c"; sourceTree = "<group>"; };
+-		1124DD6C25B4FF3C00EEFC2C /* stack-if.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stack-if.c"; sourceTree = "<group>"; };
+-		1124DD6D25B4FF3C00EEFC2C /* stack-arpv4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stack-arpv4.c"; sourceTree = "<group>"; };
+-		1124DD6E25B4FF3C00EEFC2C /* stack-arpv4.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stack-arpv4.h"; sourceTree = "<group>"; };
+-		112A87191F9D8DF200D4D240 /* out-ndjson.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-ndjson.c"; sourceTree = "<group>"; };
+-		113AD3B818208A1900D5E067 /* masscan-status.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "masscan-status.h"; sourceTree = "<group>"; };
+-		11420DD219A2D47A00DB5BFE /* proto-vnc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-vnc.c"; sourceTree = "<group>"; };
+-		11420DD519A2D48C00DB5BFE /* proto-vnc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-vnc.h"; sourceTree = "<group>"; };
+-		11420DD619A815CD00DB5BFE /* proto-ftp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-ftp.h"; sourceTree = "<group>"; };
+-		11420DD719A8160500DB5BFE /* proto-ftp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ftp.c"; sourceTree = "<group>"; };
+-		11420DD919A844B000DB5BFE /* proto-smtp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-smtp.h"; sourceTree = "<group>"; };
+-		11420DDA19A84A9E00DB5BFE /* proto-smtp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-smtp.c"; sourceTree = "<group>"; };
+-		11420DDC19A8F2D200DB5BFE /* proto-pop3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-pop3.h"; sourceTree = "<group>"; };
+-		11420DDD19A8FDE300DB5BFE /* proto-pop3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-pop3.c"; sourceTree = "<group>"; };
+-		11420DDF19A90CB300DB5BFE /* proto-interactive.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-interactive.c"; sourceTree = "<group>"; };
+-		11420DE119A9361500DB5BFE /* proto-imap4.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-imap4.h"; sourceTree = "<group>"; };
+-		11420DE219A9363A00DB5BFE /* proto-imap4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-imap4.c"; sourceTree = "<group>"; };
+-		11469CA02295D80A00FA76BE /* misc-rstfilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "misc-rstfilter.h"; sourceTree = "<group>"; };
+-		11469CA12295D80A00FA76BE /* misc-rstfilter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "misc-rstfilter.c"; sourceTree = "<group>"; };
+-		115C0CA318035BC5004E6CD7 /* out-record.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "out-record.h"; sourceTree = "<group>"; };
+-		115C0CA418035BC5004E6CD7 /* proto-dns-parse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-dns-parse.h"; sourceTree = "<group>"; };
+-		115C0CA518035BC5004E6CD7 /* proto-netbios.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-netbios.c"; sourceTree = "<group>"; };
+-		115C0CA618035BC5004E6CD7 /* proto-netbios.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-netbios.h"; sourceTree = "<group>"; };
+-		115C0CA718035BC5004E6CD7 /* proto-ssl.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ssl.c"; sourceTree = "<group>"; };
+-		115C0CA818035BC5004E6CD7 /* proto-ssl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-ssl.h"; sourceTree = "<group>"; };
+-		115C0CAA18035BC5004E6CD7 /* unusedparm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = unusedparm.h; sourceTree = "<group>"; };
+-		11623F69191E0DB00075EEE6 /* out-certs.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-certs.c"; sourceTree = "<group>"; };
+-		116806EA1995D421005B0980 /* rawsock-adapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rawsock-adapter.h"; sourceTree = "<group>"; };
+-		118B9B2A25A00FA800F5FB0B /* massip-rangesv4.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "massip-rangesv4.h"; sourceTree = "<group>"; };
+-		118B9B2B25A00FA800F5FB0B /* massip-rangesv4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "massip-rangesv4.c"; sourceTree = "<group>"; };
+-		118B9B2C25A00FA800F5FB0B /* massip-rangesv6.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "massip-rangesv6.c"; sourceTree = "<group>"; };
+-		118B9B2D25A00FA900F5FB0B /* massip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = massip.h; sourceTree = "<group>"; };
+-		118B9B2E25A00FA900F5FB0B /* massip-rangesv6.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "massip-rangesv6.h"; sourceTree = "<group>"; };
+-		118B9B2F25A00FA900F5FB0B /* massip-parse.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "massip-parse.c"; sourceTree = "<group>"; };
+-		118B9B3025A00FA900F5FB0B /* massip-parse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "massip-parse.h"; sourceTree = "<group>"; };
+-		118B9B3125A00FA900F5FB0B /* massip.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = massip.c; sourceTree = "<group>"; };
+-		118E115325859D2400618314 /* proto-interactive.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-interactive.h"; sourceTree = "<group>"; };
+-		118E115425859D5200618314 /* util-bool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "util-bool.h"; sourceTree = "<group>"; };
+-		118E115525859D5300618314 /* util-checksum.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "util-checksum.c"; sourceTree = "<group>"; };
+-		118E115625859D5300618314 /* util-checksum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "util-checksum.h"; sourceTree = "<group>"; };
+-		118E115825859E6F00618314 /* rawsock-getip6.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-getip6.c"; sourceTree = "<group>"; };
+-		119968FB21388A3B00E82767 /* read-service-probes.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "read-service-probes.c"; sourceTree = "<group>"; };
+-		119968FD21388A5300E82767 /* read-service-probes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "read-service-probes.h"; sourceTree = "<group>"; };
+-		119968FE2141AB3600E82767 /* stub-pfring.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stub-pfring.c"; sourceTree = "<group>"; };
+-		119968FF2141AB3600E82767 /* stub-pcap.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stub-pcap.c"; sourceTree = "<group>"; };
+-		119969022141ABAC00E82767 /* stub-pfring.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stub-pfring.h"; sourceTree = "<group>"; };
+-		119969032141ABAC00E82767 /* stub-pcap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stub-pcap.h"; sourceTree = "<group>"; };
+-		119AB2042051FFED008E4DDD /* proto-memcached.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-memcached.c"; sourceTree = "<group>"; };
+-		119AB2052051FFED008E4DDD /* proto-memcached.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-memcached.h"; sourceTree = "<group>"; };
+-		11A50CAD191C128F006D5802 /* out-json.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-json.c"; sourceTree = "<group>"; };
+-		11A773E91881BFC700B135DE /* crypto-base64.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "crypto-base64.c"; sourceTree = "<group>"; };
+-		11A773EA1881BFC700B135DE /* crypto-base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "crypto-base64.h"; sourceTree = "<group>"; };
+-		11A868081816F3A7008E00B8 /* in-binary.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "in-binary.c"; sourceTree = "<group>"; };
+-		11A868091816F3A7008E00B8 /* in-binary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "in-binary.h"; sourceTree = "<group>"; };
+-		11A8680A1816F3A7008E00B8 /* main-globals.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "main-globals.h"; sourceTree = "<group>"; };
+-		11A8680B1816F3A7008E00B8 /* stack-src.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stack-src.c"; sourceTree = "<group>"; };
+-		11A8680C1816F3A7008E00B8 /* stack-src.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stack-src.h"; sourceTree = "<group>"; };
+-		11A8680D1816F3A7008E00B8 /* masscan-app.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "masscan-app.c"; sourceTree = "<group>"; };
+-		11A8680E1816F3A7008E00B8 /* masscan-app.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "masscan-app.h"; sourceTree = "<group>"; };
+-		11A8680F1816F3A7008E00B8 /* out-redis.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-redis.c"; sourceTree = "<group>"; };
+-		11A868101816F3A7008E00B8 /* pixie-file.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "pixie-file.c"; sourceTree = "<group>"; };
+-		11A868111816F3A7008E00B8 /* pixie-file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "pixie-file.h"; sourceTree = "<group>"; };
+-		11A868121816F3A7008E00B8 /* pixie-sockets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "pixie-sockets.h"; sourceTree = "<group>"; };
+-		11A868131816F3A7008E00B8 /* siphash24.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = siphash24.c; sourceTree = "<group>"; };
+-		11A868141816F3A7008E00B8 /* siphash24.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = siphash24.h; sourceTree = "<group>"; };
+-		11A8681C1819A6F7008E00B8 /* proto-zeroaccess.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-zeroaccess.c"; sourceTree = "<group>"; };
+-		11A8681D1819A6F7008E00B8 /* proto-zeroaccess.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-zeroaccess.h"; sourceTree = "<group>"; };
+-		11A9218517DBCB3200DDFD32 /* masscan */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = masscan; sourceTree = BUILT_PRODUCTS_DIR; };
+-		11A9219317DBCC7E00DDFD32 /* event-timeout.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "event-timeout.c"; sourceTree = "<group>"; };
+-		11A9219417DBCC7E00DDFD32 /* event-timeout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "event-timeout.h"; sourceTree = "<group>"; };
+-		11A9219517DBCC7E00DDFD32 /* logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = logger.c; sourceTree = "<group>"; };
+-		11A9219617DBCC7E00DDFD32 /* logger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = logger.h; sourceTree = "<group>"; };
+-		11A9219717DBCC7E00DDFD32 /* main-conf.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-conf.c"; sourceTree = "<group>"; };
+-		11A9219817DBCC7E00DDFD32 /* main-dedup.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-dedup.c"; sourceTree = "<group>"; };
+-		11A9219917DBCC7E00DDFD32 /* main-dedup.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "main-dedup.h"; sourceTree = "<group>"; };
+-		11A9219A17DBCC7E00DDFD32 /* main-initadapter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-initadapter.c"; sourceTree = "<group>"; };
+-		11A9219B17DBCC7E00DDFD32 /* main-status.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-status.c"; sourceTree = "<group>"; };
+-		11A9219C17DBCC7E00DDFD32 /* main-status.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "main-status.h"; sourceTree = "<group>"; };
+-		11A9219D17DBCC7E00DDFD32 /* main-throttle.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-throttle.c"; sourceTree = "<group>"; };
+-		11A9219E17DBCC7E00DDFD32 /* main-throttle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "main-throttle.h"; sourceTree = "<group>"; };
+-		11A9219F17DBCC7E00DDFD32 /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+-		11A921A017DBCC7E00DDFD32 /* masscan.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = masscan.h; sourceTree = "<group>"; };
+-		11A921A117DBCC7E00DDFD32 /* out-binary.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-binary.c"; sourceTree = "<group>"; };
+-		11A921A217DBCC7E00DDFD32 /* out-null.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-null.c"; sourceTree = "<group>"; };
+-		11A921A317DBCC7E00DDFD32 /* out-text.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-text.c"; sourceTree = "<group>"; };
+-		11A921A417DBCC7E00DDFD32 /* out-xml.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-xml.c"; sourceTree = "<group>"; };
+-		11A921A517DBCC7E00DDFD32 /* output.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = output.c; sourceTree = "<group>"; };
+-		11A921A617DBCC7E00DDFD32 /* output.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = output.h; sourceTree = "<group>"; };
+-		11A921A717DBCC7E00DDFD32 /* packet-queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "packet-queue.h"; sourceTree = "<group>"; };
+-		11A921A817DBCC7E00DDFD32 /* pixie-threads.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "pixie-threads.c"; sourceTree = "<group>"; };
+-		11A921A917DBCC7E00DDFD32 /* pixie-threads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "pixie-threads.h"; sourceTree = "<group>"; };
+-		11A921AA17DBCC7E00DDFD32 /* pixie-timer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "pixie-timer.c"; sourceTree = "<group>"; };
+-		11A921AB17DBCC7E00DDFD32 /* pixie-timer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "pixie-timer.h"; sourceTree = "<group>"; };
+-		11A921AC17DBCC7E00DDFD32 /* proto-arp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-arp.c"; sourceTree = "<group>"; };
+-		11A921AD17DBCC7E00DDFD32 /* proto-arp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-arp.h"; sourceTree = "<group>"; };
+-		11A921AE17DBCC7E00DDFD32 /* proto-banner1.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-banner1.c"; sourceTree = "<group>"; };
+-		11A921AF17DBCC7E00DDFD32 /* proto-banner1.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-banner1.h"; sourceTree = "<group>"; };
+-		11A921B017DBCC7E00DDFD32 /* proto-preprocess.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-preprocess.c"; sourceTree = "<group>"; };
+-		11A921B117DBCC7E00DDFD32 /* proto-preprocess.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-preprocess.h"; sourceTree = "<group>"; };
+-		11A921B217DBCC7E00DDFD32 /* proto-tcp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-tcp.c"; sourceTree = "<group>"; };
+-		11A921B317DBCC7E00DDFD32 /* proto-tcp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-tcp.h"; sourceTree = "<group>"; };
+-		11A921B417DBCC7E00DDFD32 /* rand-blackrock.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rand-blackrock.c"; sourceTree = "<group>"; };
+-		11A921B517DBCC7E00DDFD32 /* rand-blackrock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rand-blackrock.h"; sourceTree = "<group>"; };
+-		11A921B617DBCC7E00DDFD32 /* rand-lcg.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rand-lcg.c"; sourceTree = "<group>"; };
+-		11A921B717DBCC7E00DDFD32 /* rand-lcg.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rand-lcg.h"; sourceTree = "<group>"; };
+-		11A921B817DBCC7E00DDFD32 /* rand-primegen.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rand-primegen.c"; sourceTree = "<group>"; };
+-		11A921B917DBCC7E00DDFD32 /* rand-primegen.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rand-primegen.h"; sourceTree = "<group>"; };
+-		11A921BD17DBCC7E00DDFD32 /* rawsock-getif.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-getif.c"; sourceTree = "<group>"; };
+-		11A921BE17DBCC7E00DDFD32 /* rawsock-getip.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-getip.c"; sourceTree = "<group>"; };
+-		11A921BF17DBCC7E00DDFD32 /* rawsock-getmac.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-getmac.c"; sourceTree = "<group>"; };
+-		11A921C017DBCC7E00DDFD32 /* rawsock-getroute.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-getroute.c"; sourceTree = "<group>"; };
+-		11A921C117DBCC7E00DDFD32 /* rawsock-pcapfile.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rawsock-pcapfile.c"; sourceTree = "<group>"; };
+-		11A921C217DBCC7E00DDFD32 /* rawsock-pcapfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rawsock-pcapfile.h"; sourceTree = "<group>"; };
+-		11A921C517DBCC7E00DDFD32 /* rawsock.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = rawsock.c; sourceTree = "<group>"; };
+-		11A921C617DBCC7E00DDFD32 /* rawsock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rawsock.h; sourceTree = "<group>"; };
+-		11A921C717DBCC7E00DDFD32 /* rte-ring.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "rte-ring.c"; sourceTree = "<group>"; };
+-		11A921C817DBCC7E00DDFD32 /* rte-ring.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "rte-ring.h"; sourceTree = "<group>"; };
+-		11A921C917DBCC7E00DDFD32 /* smack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = smack.h; sourceTree = "<group>"; };
+-		11A921CA17DBCC7E00DDFD32 /* smack1.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = smack1.c; sourceTree = "<group>"; };
+-		11A921CB17DBCC7E00DDFD32 /* smackqueue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = smackqueue.c; sourceTree = "<group>"; };
+-		11A921CC17DBCC7E00DDFD32 /* smackqueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = smackqueue.h; sourceTree = "<group>"; };
+-		11A921CD17DBCC7E00DDFD32 /* string_s.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = string_s.c; sourceTree = "<group>"; };
+-		11A921CE17DBCC7E00DDFD32 /* string_s.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = string_s.h; sourceTree = "<group>"; };
+-		11A921CF17DBCC7E00DDFD32 /* syn-cookie.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "syn-cookie.c"; sourceTree = "<group>"; };
+-		11A921D017DBCC7E00DDFD32 /* syn-cookie.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "syn-cookie.h"; sourceTree = "<group>"; };
+-		11A921D117DBCC7E00DDFD32 /* templ-pkt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "templ-pkt.c"; sourceTree = "<group>"; };
+-		11A921D217DBCC7E00DDFD32 /* templ-pkt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "templ-pkt.h"; sourceTree = "<group>"; };
+-		11A921D317DBCC7E00DDFD32 /* xring.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = xring.c; sourceTree = "<group>"; };
+-		11A921D417DBCC7E00DDFD32 /* xring.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xring.h; sourceTree = "<group>"; };
+-		11A921FB17DBD17600DDFD32 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+-		11AC2F99188CE34A008CB623 /* proto-sctp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-sctp.c"; sourceTree = "<group>"; };
+-		11AC2F9A188CE34A008CB623 /* proto-sctp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-sctp.h"; sourceTree = "<group>"; };
+-		11AC80E717E0DAD4001BCE3A /* proto-http.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-http.c"; sourceTree = "<group>"; };
+-		11AC80E817E0DAD4001BCE3A /* proto-http.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-http.h"; sourceTree = "<group>"; };
+-		11AC80E917E0DAD4001BCE3A /* proto-icmp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-icmp.c"; sourceTree = "<group>"; };
+-		11AC80EA17E0DAD4001BCE3A /* proto-icmp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-icmp.h"; sourceTree = "<group>"; };
+-		11AC80EB17E0DAD4001BCE3A /* proto-ssh.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ssh.c"; sourceTree = "<group>"; };
+-		11AC80EC17E0DAD4001BCE3A /* proto-ssh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-ssh.h"; sourceTree = "<group>"; };
+-		11AC80F517E0ED47001BCE3A /* main-ptrace.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-ptrace.c"; sourceTree = "<group>"; };
+-		11AC80F817E0EDA7001BCE3A /* main-ptrace.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "main-ptrace.h"; sourceTree = "<group>"; };
+-		11B039C017E506B400925E7E /* main-listscan.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-listscan.c"; sourceTree = "<group>"; };
+-		11B039C317E7834000925E7E /* proto-dns.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-dns.c"; sourceTree = "<group>"; };
+-		11B039C417E7834000925E7E /* proto-dns.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-dns.h"; sourceTree = "<group>"; };
+-		11B039C517E7834000925E7E /* proto-udp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-udp.c"; sourceTree = "<group>"; };
+-		11B039C617E7834000925E7E /* proto-udp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-udp.h"; sourceTree = "<group>"; };
+-		11B039C917EA092B00925E7E /* proto-snmp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-snmp.c"; sourceTree = "<group>"; };
+-		11B039CA17EA092B00925E7E /* proto-snmp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-snmp.h"; sourceTree = "<group>"; };
+-		11B05EA418B9649F009C935E /* crypto-blackrock2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "crypto-blackrock2.c"; sourceTree = "<group>"; };
+-		11B05EA518B9649F009C935E /* main-readrange.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "main-readrange.c"; sourceTree = "<group>"; };
+-		11B05EA918B964A9009C935E /* main-readrange.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "main-readrange.h"; sourceTree = "<group>"; };
+-		11B22ED018641DCC00DA5438 /* proto-banout.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-banout.c"; sourceTree = "<group>"; };
+-		11B22ED118641DCC00DA5438 /* proto-banout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-banout.h"; sourceTree = "<group>"; };
+-		11B22ED218641DCC00DA5438 /* proto-ssl-test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ssl-test.c"; sourceTree = "<group>"; };
+-		11B22ED318641DCC00DA5438 /* proto-x509.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-x509.c"; sourceTree = "<group>"; };
+-		11B22ED418641DCC00DA5438 /* proto-x509.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-x509.h"; sourceTree = "<group>"; };
+-		11B2DD9C17DE4DD8007FC363 /* templ-payloads.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "templ-payloads.c"; sourceTree = "<group>"; };
+-		11B2DD9D17DE4DD8007FC363 /* templ-payloads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "templ-payloads.h"; sourceTree = "<group>"; };
+-		11B5897C21C0785B00DD6248 /* util-malloc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "util-malloc.h"; sourceTree = "<group>"; };
+-		11B5897D21C0785B00DD6248 /* util-malloc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "util-malloc.c"; sourceTree = "<group>"; };
+-		11B6297525995AA100D4786F /* stack-queue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stack-queue.c"; sourceTree = "<group>"; };
+-		11B6297625995AA100D4786F /* stack-ndpv6.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stack-ndpv6.c"; sourceTree = "<group>"; };
+-		11B6297725995AA100D4786F /* stack-queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stack-queue.h"; sourceTree = "<group>"; };
+-		11B6297825995AA100D4786F /* stack-ndpv6.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stack-ndpv6.h"; sourceTree = "<group>"; };
+-		11BA295E18902CEE0064A759 /* masscan-version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "masscan-version.h"; sourceTree = "<group>"; };
+-		11BA295F18902CEE0064A759 /* out-grepable.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-grepable.c"; sourceTree = "<group>"; };
+-		11BA296018902CEE0064A759 /* proto-tcp-telnet.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-tcp-telnet.c"; sourceTree = "<group>"; };
+-		11BA296118902CEE0064A759 /* proto-tcp-telnet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-tcp-telnet.h"; sourceTree = "<group>"; };
+-		11BA296A189060220064A759 /* proto-ntp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-ntp.c"; sourceTree = "<group>"; };
+-		11BA296C189060590064A759 /* proto-ntp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "proto-ntp.h"; sourceTree = "<group>"; };
+-		11BE532E25A62C4100451F95 /* massip-port.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "massip-port.h"; sourceTree = "<group>"; };
+-		11BE533425A6441100451F95 /* massip-addr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "massip-addr.h"; sourceTree = "<group>"; };
+-		11BE533525A6441100451F95 /* massip-addr.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "massip-addr.c"; sourceTree = "<group>"; };
+-		11C936BF1EDCE77F0023D32E /* in-filter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "in-filter.c"; sourceTree = "<group>"; };
+-		11C936C01EDCE77F0023D32E /* in-filter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "in-filter.h"; sourceTree = "<group>"; };
+-		11C936C11EDCE77F0023D32E /* in-report.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "in-report.c"; sourceTree = "<group>"; };
+-		11C936C21EDCE77F0023D32E /* in-report.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "in-report.h"; sourceTree = "<group>"; };
+-		11D0FAF922763F4900332FA7 /* proto-coap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-coap.h"; sourceTree = "<group>"; };
+-		11D0FAFA22763F4900332FA7 /* proto-coap.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-coap.c"; sourceTree = "<group>"; };
+-		11DD363221067BD300CBE1DE /* out-tcp-services.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "out-tcp-services.h"; sourceTree = "<group>"; };
+-		11DD363321067BD300CBE1DE /* out-tcp-services.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "out-tcp-services.c"; sourceTree = "<group>"; };
+-		11DD36362107DE9700CBE1DE /* stub-lua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "stub-lua.c"; sourceTree = "<group>"; };
+-		11DD36372107DE9700CBE1DE /* stub-lua.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stub-lua.h"; sourceTree = "<group>"; };
+-		11DD36392107DFEB00CBE1DE /* scripting.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = scripting.h; sourceTree = "<group>"; };
+-		11DD363A2107DFEB00CBE1DE /* scripting.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = scripting.c; sourceTree = "<group>"; };
+-		11DD363C2107E7ED00CBE1DE /* vulncheck-heartbleed.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "vulncheck-heartbleed.c"; sourceTree = "<group>"; };
+-		11DD363D2107E7ED00CBE1DE /* vulncheck-sslv3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "vulncheck-sslv3.c"; sourceTree = "<group>"; };
+-		11DD363E2107E7ED00CBE1DE /* vulncheck.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vulncheck.h; sourceTree = "<group>"; };
+-		11DD363F2107E7ED00CBE1DE /* vulncheck.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vulncheck.c; sourceTree = "<group>"; };
+-		11DD36402107E7ED00CBE1DE /* vulncheck-ntp-monlist.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "vulncheck-ntp-monlist.c"; sourceTree = "<group>"; };
+-		11DD36452107EB8700CBE1DE /* scripting-masscan.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "scripting-masscan.c"; sourceTree = "<group>"; };
+-		11DD36472108DCBB00CBE1DE /* versioning.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = versioning.c; sourceTree = "<group>"; };
+-		11DD36482108DCBB00CBE1DE /* versioning.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = versioning.h; sourceTree = "<group>"; };
+-		11DD364A2108E0CB00CBE1DE /* scripting-banner.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "scripting-banner.c"; sourceTree = "<group>"; };
+-		11DE129420ABC2650041135D /* proto-smb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "proto-smb.h"; sourceTree = "<group>"; };
+-		11DE129520ABC2650041135D /* proto-smb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "proto-smb.c"; sourceTree = "<group>"; };
+-		11E76DB21889BC5200061F45 /* pixie-backtrace.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "pixie-backtrace.c"; sourceTree = "<group>"; };
+-		11E76DB31889BC5200061F45 /* pixie-backtrace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "pixie-backtrace.h"; sourceTree = "<group>"; };
+-/* End PBXFileReference section */
+-
+-/* Begin PBXFrameworksBuildPhase section */
+-		11A9218217DBCB3200DDFD32 /* Frameworks */ = {
+-			isa = PBXFrameworksBuildPhase;
+-			buildActionMask = 2147483647;
+-			files = (
+-			);
+-			runOnlyForDeploymentPostprocessing = 0;
+-		};
+-/* End PBXFrameworksBuildPhase section */
+-
+-/* Begin PBXGroup section */
+-		112A9A0B258A89FC00D1EEBA /* massip */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11BE533525A6441100451F95 /* massip-addr.c */,
+-				11BE533425A6441100451F95 /* massip-addr.h */,
+-				11BE532E25A62C4100451F95 /* massip-port.h */,
+-				118B9B2F25A00FA900F5FB0B /* massip-parse.c */,
+-				118B9B3025A00FA900F5FB0B /* massip-parse.h */,
+-				118B9B2B25A00FA800F5FB0B /* massip-rangesv4.c */,
+-				118B9B2A25A00FA800F5FB0B /* massip-rangesv4.h */,
+-				118B9B2C25A00FA800F5FB0B /* massip-rangesv6.c */,
+-				118B9B2E25A00FA900F5FB0B /* massip-rangesv6.h */,
+-				118B9B3125A00FA900F5FB0B /* massip.c */,
+-				118B9B2D25A00FA900F5FB0B /* massip.h */,
+-			);
+-			name = massip;
+-			sourceTree = "<group>";
+-		};
+-		114147AC226BD4E1009F9E93 /* stubs */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11DD36362107DE9700CBE1DE /* stub-lua.c */,
+-				11DD36372107DE9700CBE1DE /* stub-lua.h */,
+-				119969032141ABAC00E82767 /* stub-pcap.h */,
+-				119969022141ABAC00E82767 /* stub-pfring.h */,
+-				119968FF2141AB3600E82767 /* stub-pcap.c */,
+-				119968FE2141AB3600E82767 /* stub-pfring.c */,
+-			);
+-			name = stubs;
+-			sourceTree = "<group>";
+-		};
+-		118E114E2585931800618314 /* stack */ = {
+-			isa = PBXGroup;
+-			children = (
+-				1124DD6D25B4FF3C00EEFC2C /* stack-arpv4.c */,
+-				1124DD6E25B4FF3C00EEFC2C /* stack-arpv4.h */,
+-				1124DD6C25B4FF3C00EEFC2C /* stack-if.c */,
+-				11B6297625995AA100D4786F /* stack-ndpv6.c */,
+-				11B6297825995AA100D4786F /* stack-ndpv6.h */,
+-				11B6297525995AA100D4786F /* stack-queue.c */,
+-				11B6297725995AA100D4786F /* stack-queue.h */,
+-				11A8680B1816F3A7008E00B8 /* stack-src.c */,
+-				11A8680C1816F3A7008E00B8 /* stack-src.h */,
+-			);
+-			name = stack;
+-			sourceTree = "<group>";
+-		};
+-		118E114F25859CFD00618314 /* util */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11B5897C21C0785B00DD6248 /* util-malloc.h */,
+-				11B5897D21C0785B00DD6248 /* util-malloc.c */,
+-				118E115425859D5200618314 /* util-bool.h */,
+-				118E115525859D5300618314 /* util-checksum.c */,
+-				118E115625859D5300618314 /* util-checksum.h */,
+-				118E115325859D2400618314 /* proto-interactive.h */,
+-			);
+-			name = util;
+-			sourceTree = "<group>";
+-		};
+-		11A9217A17DBCB3200DDFD32 = {
+-			isa = PBXGroup;
+-			children = (
+-				11A921FB17DBD17600DDFD32 /* README.md */,
+-				11A9219217DBCC7E00DDFD32 /* src */,
+-				11A9218617DBCB3200DDFD32 /* Products */,
+-			);
+-			sourceTree = "<group>";
+-		};
+-		11A9218617DBCB3200DDFD32 /* Products */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11A9218517DBCB3200DDFD32 /* masscan */,
+-			);
+-			name = Products;
+-			sourceTree = "<group>";
+-		};
+-		11A9219217DBCC7E00DDFD32 /* src */ = {
+-			isa = PBXGroup;
+-			children = (
+-				118E114E2585931800618314 /* stack */,
+-				112A9A0B258A89FC00D1EEBA /* massip */,
+-				118E114F25859CFD00618314 /* util */,
+-				114147AC226BD4E1009F9E93 /* stubs */,
+-				11DD36352107DE8200CBE1DE /* scripting */,
+-				11B360CD1F90174B0020F3A3 /* misc */,
+-				11B360C71F90166D0020F3A3 /* rawsock */,
+-				11B360CC1F90170D0020F3A3 /* crypto */,
+-				11B360C81F90169F0020F3A3 /* main */,
+-				11B360C91F9016AD0020F3A3 /* out */,
+-				11B360CB1F9016D80020F3A3 /* pixie */,
+-				11B360CA1F9016C00020F3A3 /* proto */,
+-			);
+-			name = src;
+-			path = ../src;
+-			sourceTree = "<group>";
+-		};
+-		11B360C71F90166D0020F3A3 /* rawsock */ = {
+-			isa = PBXGroup;
+-			children = (
+-				118E115825859E6F00618314 /* rawsock-getip6.c */,
+-				11A921C617DBCC7E00DDFD32 /* rawsock.h */,
+-				11A921C517DBCC7E00DDFD32 /* rawsock.c */,
+-				116806EA1995D421005B0980 /* rawsock-adapter.h */,
+-				11A921BD17DBCC7E00DDFD32 /* rawsock-getif.c */,
+-				11A921BE17DBCC7E00DDFD32 /* rawsock-getip.c */,
+-				11A921BF17DBCC7E00DDFD32 /* rawsock-getmac.c */,
+-				11A921C017DBCC7E00DDFD32 /* rawsock-getroute.c */,
+-				11A921C117DBCC7E00DDFD32 /* rawsock-pcapfile.c */,
+-				11A921C217DBCC7E00DDFD32 /* rawsock-pcapfile.h */,
+-			);
+-			name = rawsock;
+-			sourceTree = "<group>";
+-		};
+-		11B360C81F90169F0020F3A3 /* main */ = {
+-			isa = PBXGroup;
+-			children = (
+-				119968FD21388A5300E82767 /* read-service-probes.h */,
+-				119968FB21388A3B00E82767 /* read-service-probes.c */,
+-				11A8680D1816F3A7008E00B8 /* masscan-app.c */,
+-				11A8680E1816F3A7008E00B8 /* masscan-app.h */,
+-				113AD3B818208A1900D5E067 /* masscan-status.h */,
+-				11BA295E18902CEE0064A759 /* masscan-version.h */,
+-				11A921A017DBCC7E00DDFD32 /* masscan.h */,
+-				11A9219717DBCC7E00DDFD32 /* main-conf.c */,
+-				11A9219817DBCC7E00DDFD32 /* main-dedup.c */,
+-				11A9219917DBCC7E00DDFD32 /* main-dedup.h */,
+-				11A8680A1816F3A7008E00B8 /* main-globals.h */,
+-				11A9219A17DBCC7E00DDFD32 /* main-initadapter.c */,
+-				11B039C017E506B400925E7E /* main-listscan.c */,
+-				11AC80F517E0ED47001BCE3A /* main-ptrace.c */,
+-				11AC80F817E0EDA7001BCE3A /* main-ptrace.h */,
+-				11B05EA518B9649F009C935E /* main-readrange.c */,
+-				11B05EA918B964A9009C935E /* main-readrange.h */,
+-				11A9219B17DBCC7E00DDFD32 /* main-status.c */,
+-				11A9219C17DBCC7E00DDFD32 /* main-status.h */,
+-				11A9219D17DBCC7E00DDFD32 /* main-throttle.c */,
+-				11A9219E17DBCC7E00DDFD32 /* main-throttle.h */,
+-				11A9219F17DBCC7E00DDFD32 /* main.c */,
+-			);
+-			name = main;
+-			sourceTree = "<group>";
+-		};
+-		11B360C91F9016AD0020F3A3 /* out */ = {
+-			isa = PBXGroup;
+-			children = (
+-				1124DD6A25B4FF1600EEFC2C /* out-hostonly.c */,
+-				11DD363321067BD300CBE1DE /* out-tcp-services.c */,
+-				11DD363221067BD300CBE1DE /* out-tcp-services.h */,
+-				112A87191F9D8DF200D4D240 /* out-ndjson.c */,
+-				11623F69191E0DB00075EEE6 /* out-certs.c */,
+-				11A868081816F3A7008E00B8 /* in-binary.c */,
+-				11A868091816F3A7008E00B8 /* in-binary.h */,
+-				11C936BF1EDCE77F0023D32E /* in-filter.c */,
+-				11C936C01EDCE77F0023D32E /* in-filter.h */,
+-				11C936C11EDCE77F0023D32E /* in-report.c */,
+-				11C936C21EDCE77F0023D32E /* in-report.h */,
+-				11126596197A086B00DC5987 /* out-unicornscan.c */,
+-				11A921A117DBCC7E00DDFD32 /* out-binary.c */,
+-				11BA295F18902CEE0064A759 /* out-grepable.c */,
+-				11A50CAD191C128F006D5802 /* out-json.c */,
+-				11A921A217DBCC7E00DDFD32 /* out-null.c */,
+-				115C0CA318035BC5004E6CD7 /* out-record.h */,
+-				11A8680F1816F3A7008E00B8 /* out-redis.c */,
+-				11A921A317DBCC7E00DDFD32 /* out-text.c */,
+-				11A921A417DBCC7E00DDFD32 /* out-xml.c */,
+-				11A921A517DBCC7E00DDFD32 /* output.c */,
+-				11A921A617DBCC7E00DDFD32 /* output.h */,
+-			);
+-			name = out;
+-			sourceTree = "<group>";
+-		};
+-		11B360CA1F9016C00020F3A3 /* proto */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11A921AC17DBCC7E00DDFD32 /* proto-arp.c */,
+-				11A921AD17DBCC7E00DDFD32 /* proto-arp.h */,
+-				11A921AE17DBCC7E00DDFD32 /* proto-banner1.c */,
+-				11A921AF17DBCC7E00DDFD32 /* proto-banner1.h */,
+-				11B22ED018641DCC00DA5438 /* proto-banout.c */,
+-				11B22ED118641DCC00DA5438 /* proto-banout.h */,
+-				11D0FAFA22763F4900332FA7 /* proto-coap.c */,
+-				11D0FAF922763F4900332FA7 /* proto-coap.h */,
+-				115C0CA418035BC5004E6CD7 /* proto-dns-parse.h */,
+-				11B039C317E7834000925E7E /* proto-dns.c */,
+-				11B039C417E7834000925E7E /* proto-dns.h */,
+-				11420DD719A8160500DB5BFE /* proto-ftp.c */,
+-				11420DD619A815CD00DB5BFE /* proto-ftp.h */,
+-				11AC80E717E0DAD4001BCE3A /* proto-http.c */,
+-				11AC80E817E0DAD4001BCE3A /* proto-http.h */,
+-				11AC80E917E0DAD4001BCE3A /* proto-icmp.c */,
+-				11AC80EA17E0DAD4001BCE3A /* proto-icmp.h */,
+-				11420DE219A9363A00DB5BFE /* proto-imap4.c */,
+-				11420DE119A9361500DB5BFE /* proto-imap4.h */,
+-				11420DDF19A90CB300DB5BFE /* proto-interactive.c */,
+-				119AB2042051FFED008E4DDD /* proto-memcached.c */,
+-				119AB2052051FFED008E4DDD /* proto-memcached.h */,
+-				115C0CA518035BC5004E6CD7 /* proto-netbios.c */,
+-				115C0CA618035BC5004E6CD7 /* proto-netbios.h */,
+-				110ED16720CB0BC200690C91 /* proto-ntlmssp.c */,
+-				110ED16620CB0BC200690C91 /* proto-ntlmssp.h */,
+-				11BA296A189060220064A759 /* proto-ntp.c */,
+-				11BA296C189060590064A759 /* proto-ntp.h */,
+-				110C79AF22833AF9003FAC94 /* proto-oproto.c */,
+-				110C79AE22833AF9003FAC94 /* proto-oproto.h */,
+-				11420DDD19A8FDE300DB5BFE /* proto-pop3.c */,
+-				11420DDC19A8F2D200DB5BFE /* proto-pop3.h */,
+-				11A921B017DBCC7E00DDFD32 /* proto-preprocess.c */,
+-				11A921B117DBCC7E00DDFD32 /* proto-preprocess.h */,
+-				11AC2F99188CE34A008CB623 /* proto-sctp.c */,
+-				11AC2F9A188CE34A008CB623 /* proto-sctp.h */,
+-				11DE129520ABC2650041135D /* proto-smb.c */,
+-				11DE129420ABC2650041135D /* proto-smb.h */,
+-				11420DDA19A84A9E00DB5BFE /* proto-smtp.c */,
+-				11420DD919A844B000DB5BFE /* proto-smtp.h */,
+-				11B039C917EA092B00925E7E /* proto-snmp.c */,
+-				11B039CA17EA092B00925E7E /* proto-snmp.h */,
+-				110ED16520CA6A8300690C91 /* proto-spnego.h */,
+-				11AC80EB17E0DAD4001BCE3A /* proto-ssh.c */,
+-				11AC80EC17E0DAD4001BCE3A /* proto-ssh.h */,
+-				11B22ED218641DCC00DA5438 /* proto-ssl-test.c */,
+-				115C0CA718035BC5004E6CD7 /* proto-ssl.c */,
+-				115C0CA818035BC5004E6CD7 /* proto-ssl.h */,
+-				1107E9B1228DF7BB003384B3 /* proto-tcp-rdp.c */,
+-				1107E9B0228DF7BB003384B3 /* proto-tcp-rdp.h */,
+-				11BA296018902CEE0064A759 /* proto-tcp-telnet.c */,
+-				11BA296118902CEE0064A759 /* proto-tcp-telnet.h */,
+-				11A921B217DBCC7E00DDFD32 /* proto-tcp.c */,
+-				11A921B317DBCC7E00DDFD32 /* proto-tcp.h */,
+-				11B039C517E7834000925E7E /* proto-udp.c */,
+-				11B039C617E7834000925E7E /* proto-udp.h */,
+-				11420DD219A2D47A00DB5BFE /* proto-vnc.c */,
+-				11420DD519A2D48C00DB5BFE /* proto-vnc.h */,
+-				11B22ED318641DCC00DA5438 /* proto-x509.c */,
+-				11B22ED418641DCC00DA5438 /* proto-x509.h */,
+-				11A8681C1819A6F7008E00B8 /* proto-zeroaccess.c */,
+-				11A8681D1819A6F7008E00B8 /* proto-zeroaccess.h */,
+-				11B2DD9C17DE4DD8007FC363 /* templ-payloads.c */,
+-				11B2DD9D17DE4DD8007FC363 /* templ-payloads.h */,
+-				11A921D117DBCC7E00DDFD32 /* templ-pkt.c */,
+-				11A921D217DBCC7E00DDFD32 /* templ-pkt.h */,
+-			);
+-			name = proto;
+-			sourceTree = "<group>";
+-		};
+-		11B360CB1F9016D80020F3A3 /* pixie */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11E76DB21889BC5200061F45 /* pixie-backtrace.c */,
+-				11E76DB31889BC5200061F45 /* pixie-backtrace.h */,
+-				11A868101816F3A7008E00B8 /* pixie-file.c */,
+-				11A868111816F3A7008E00B8 /* pixie-file.h */,
+-				11A868121816F3A7008E00B8 /* pixie-sockets.h */,
+-				11A921A817DBCC7E00DDFD32 /* pixie-threads.c */,
+-				11A921A917DBCC7E00DDFD32 /* pixie-threads.h */,
+-				11A921AA17DBCC7E00DDFD32 /* pixie-timer.c */,
+-				11A921AB17DBCC7E00DDFD32 /* pixie-timer.h */,
+-			);
+-			name = pixie;
+-			sourceTree = "<group>";
+-		};
+-		11B360CC1F90170D0020F3A3 /* crypto */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11A773E91881BFC700B135DE /* crypto-base64.c */,
+-				11A773EA1881BFC700B135DE /* crypto-base64.h */,
+-				11B05EA418B9649F009C935E /* crypto-blackrock2.c */,
+-				11A921B417DBCC7E00DDFD32 /* rand-blackrock.c */,
+-				11A921B517DBCC7E00DDFD32 /* rand-blackrock.h */,
+-				11A921B617DBCC7E00DDFD32 /* rand-lcg.c */,
+-				11A921B717DBCC7E00DDFD32 /* rand-lcg.h */,
+-				11A921B817DBCC7E00DDFD32 /* rand-primegen.c */,
+-				11A921B917DBCC7E00DDFD32 /* rand-primegen.h */,
+-				11A868131816F3A7008E00B8 /* siphash24.c */,
+-				11A868141816F3A7008E00B8 /* siphash24.h */,
+-				11A921CF17DBCC7E00DDFD32 /* syn-cookie.c */,
+-				11A921D017DBCC7E00DDFD32 /* syn-cookie.h */,
+-			);
+-			name = crypto;
+-			sourceTree = "<group>";
+-		};
+-		11B360CD1F90174B0020F3A3 /* misc */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11469CA12295D80A00FA76BE /* misc-rstfilter.c */,
+-				11469CA02295D80A00FA76BE /* misc-rstfilter.h */,
+-				115C0CAA18035BC5004E6CD7 /* unusedparm.h */,
+-				11A921D317DBCC7E00DDFD32 /* xring.c */,
+-				11A921D417DBCC7E00DDFD32 /* xring.h */,
+-				11A921C717DBCC7E00DDFD32 /* rte-ring.c */,
+-				11A921C817DBCC7E00DDFD32 /* rte-ring.h */,
+-				11A921C917DBCC7E00DDFD32 /* smack.h */,
+-				11A921CA17DBCC7E00DDFD32 /* smack1.c */,
+-				11A921CB17DBCC7E00DDFD32 /* smackqueue.c */,
+-				11A921CC17DBCC7E00DDFD32 /* smackqueue.h */,
+-				11A921CD17DBCC7E00DDFD32 /* string_s.c */,
+-				11A921CE17DBCC7E00DDFD32 /* string_s.h */,
+-				11A921A717DBCC7E00DDFD32 /* packet-queue.h */,
+-				11A9219317DBCC7E00DDFD32 /* event-timeout.c */,
+-				11A9219417DBCC7E00DDFD32 /* event-timeout.h */,
+-				11A9219517DBCC7E00DDFD32 /* logger.c */,
+-				11A9219617DBCC7E00DDFD32 /* logger.h */,
+-			);
+-			name = misc;
+-			sourceTree = "<group>";
+-		};
+-		11DD36352107DE8200CBE1DE /* scripting */ = {
+-			isa = PBXGroup;
+-			children = (
+-				11DD364A2108E0CB00CBE1DE /* scripting-banner.c */,
+-				11DD36472108DCBB00CBE1DE /* versioning.c */,
+-				11DD36482108DCBB00CBE1DE /* versioning.h */,
+-				11DD36452107EB8700CBE1DE /* scripting-masscan.c */,
+-				11DD363C2107E7ED00CBE1DE /* vulncheck-heartbleed.c */,
+-				11DD36402107E7ED00CBE1DE /* vulncheck-ntp-monlist.c */,
+-				11DD363D2107E7ED00CBE1DE /* vulncheck-sslv3.c */,
+-				11DD363F2107E7ED00CBE1DE /* vulncheck.c */,
+-				11DD363E2107E7ED00CBE1DE /* vulncheck.h */,
+-				11DD363A2107DFEB00CBE1DE /* scripting.c */,
+-				11DD36392107DFEB00CBE1DE /* scripting.h */,
+-			);
+-			name = scripting;
+-			sourceTree = "<group>";
+-		};
+-/* End PBXGroup section */
+-
+-/* Begin PBXNativeTarget section */
+-		11A9218417DBCB3200DDFD32 /* masscan */ = {
+-			isa = PBXNativeTarget;
+-			buildConfigurationList = 11A9218F17DBCB3200DDFD32 /* Build configuration list for PBXNativeTarget "masscan" */;
+-			buildPhases = (
+-				11A9218117DBCB3200DDFD32 /* Sources */,
+-				11A9218217DBCB3200DDFD32 /* Frameworks */,
+-				11A9218317DBCB3200DDFD32 /* CopyFiles */,
+-			);
+-			buildRules = (
+-			);
+-			dependencies = (
+-			);
+-			name = masscan;
+-			productName = xcode4;
+-			productReference = 11A9218517DBCB3200DDFD32 /* masscan */;
+-			productType = "com.apple.product-type.tool";
+-		};
+-/* End PBXNativeTarget section */
+-
+-/* Begin PBXProject section */
+-		11A9217C17DBCB3200DDFD32 /* Project object */ = {
+-			isa = PBXProject;
+-			attributes = {
+-				LastUpgradeCheck = 0430;
+-			};
+-			buildConfigurationList = 11A9217F17DBCB3200DDFD32 /* Build configuration list for PBXProject "masscan" */;
+-			compatibilityVersion = "Xcode 3.2";
+-			developmentRegion = English;
+-			hasScannedForEncodings = 0;
+-			knownRegions = (
+-				English,
+-				en,
+-			);
+-			mainGroup = 11A9217A17DBCB3200DDFD32;
+-			productRefGroup = 11A9218617DBCB3200DDFD32 /* Products */;
+-			projectDirPath = "";
+-			projectRoot = "";
+-			targets = (
+-				11A9218417DBCB3200DDFD32 /* masscan */,
+-			);
+-		};
+-/* End PBXProject section */
+-
+-/* Begin PBXSourcesBuildPhase section */
+-		11A9218117DBCB3200DDFD32 /* Sources */ = {
+-			isa = PBXSourcesBuildPhase;
+-			buildActionMask = 2147483647;
+-			files = (
+-				11B6297925995AA100D4786F /* stack-queue.c in Sources */,
+-				11A921D517DBCC7E00DDFD32 /* event-timeout.c in Sources */,
+-				11DD36412107E7ED00CBE1DE /* vulncheck-heartbleed.c in Sources */,
+-				118B9B3325A00FA900F5FB0B /* massip-rangesv6.c in Sources */,
+-				11A921D617DBCC7E00DDFD32 /* logger.c in Sources */,
+-				119969002141AB3600E82767 /* stub-pfring.c in Sources */,
+-				11A921D717DBCC7E00DDFD32 /* main-conf.c in Sources */,
+-				11A921D817DBCC7E00DDFD32 /* main-dedup.c in Sources */,
+-				11A921D917DBCC7E00DDFD32 /* main-initadapter.c in Sources */,
+-				11A921DA17DBCC7E00DDFD32 /* main-status.c in Sources */,
+-				118E115925859E6F00618314 /* rawsock-getip6.c in Sources */,
+-				11A921DB17DBCC7E00DDFD32 /* main-throttle.c in Sources */,
+-				11A921DC17DBCC7E00DDFD32 /* main.c in Sources */,
+-				11DD36422107E7ED00CBE1DE /* vulncheck-sslv3.c in Sources */,
+-				11A921DD17DBCC7E00DDFD32 /* out-binary.c in Sources */,
+-				11A921DE17DBCC7E00DDFD32 /* out-null.c in Sources */,
+-				110ED16820CB0BC200690C91 /* proto-ntlmssp.c in Sources */,
+-				11A921DF17DBCC7E00DDFD32 /* out-text.c in Sources */,
+-				11A921E017DBCC7E00DDFD32 /* out-xml.c in Sources */,
+-				11A921E117DBCC7E00DDFD32 /* output.c in Sources */,
+-				11A921E217DBCC7E00DDFD32 /* pixie-threads.c in Sources */,
+-				11A921E317DBCC7E00DDFD32 /* pixie-timer.c in Sources */,
+-				119968FC21388A3C00E82767 /* read-service-probes.c in Sources */,
+-				11A921E417DBCC7E00DDFD32 /* proto-arp.c in Sources */,
+-				11A921E517DBCC7E00DDFD32 /* proto-banner1.c in Sources */,
+-				119969012141AB3600E82767 /* stub-pcap.c in Sources */,
+-				1107E9B2228DF7BB003384B3 /* proto-tcp-rdp.c in Sources */,
+-				11A921E617DBCC7E00DDFD32 /* proto-preprocess.c in Sources */,
+-				11A921E717DBCC7E00DDFD32 /* proto-tcp.c in Sources */,
+-				11A921E817DBCC7E00DDFD32 /* rand-blackrock.c in Sources */,
+-				11A921E917DBCC7E00DDFD32 /* rand-lcg.c in Sources */,
+-				11A921EA17DBCC7E00DDFD32 /* rand-primegen.c in Sources */,
+-				11A921ED17DBCC7E00DDFD32 /* rawsock-getif.c in Sources */,
+-				11A921EE17DBCC7E00DDFD32 /* rawsock-getip.c in Sources */,
+-				11A921EF17DBCC7E00DDFD32 /* rawsock-getmac.c in Sources */,
+-				11B5897E21C0785C00DD6248 /* util-malloc.c in Sources */,
+-				11A921F017DBCC7E00DDFD32 /* rawsock-getroute.c in Sources */,
+-				11DD36492108DCBB00CBE1DE /* versioning.c in Sources */,
+-				11D0FAFB22763F4900332FA7 /* proto-coap.c in Sources */,
+-				11C936C41EDCE77F0023D32E /* in-report.c in Sources */,
+-				11A921F117DBCC7E00DDFD32 /* rawsock-pcapfile.c in Sources */,
+-				11A921F317DBCC7E00DDFD32 /* rawsock.c in Sources */,
+-				11DD364B2108E0CB00CBE1DE /* scripting-banner.c in Sources */,
+-				11A921F417DBCC7E00DDFD32 /* rte-ring.c in Sources */,
+-				11A921F517DBCC7E00DDFD32 /* smack1.c in Sources */,
+-				118B9B3225A00FA900F5FB0B /* massip-rangesv4.c in Sources */,
+-				11A921F617DBCC7E00DDFD32 /* smackqueue.c in Sources */,
+-				11A921F717DBCC7E00DDFD32 /* string_s.c in Sources */,
+-				11B6297A25995AA100D4786F /* stack-ndpv6.c in Sources */,
+-				11A921F817DBCC7E00DDFD32 /* syn-cookie.c in Sources */,
+-				1124DD7025B4FF3C00EEFC2C /* stack-arpv4.c in Sources */,
+-				11A921F917DBCC7E00DDFD32 /* templ-pkt.c in Sources */,
+-				11A921FA17DBCC7E00DDFD32 /* xring.c in Sources */,
+-				11DE129620ABC2650041135D /* proto-smb.c in Sources */,
+-				11B2DD9E17DE4DD8007FC363 /* templ-payloads.c in Sources */,
+-				11AC80ED17E0DAD4001BCE3A /* proto-http.c in Sources */,
+-				11AC80EE17E0DAD4001BCE3A /* proto-icmp.c in Sources */,
+-				11AC80EF17E0DAD4001BCE3A /* proto-ssh.c in Sources */,
+-				11AC80F617E0ED47001BCE3A /* main-ptrace.c in Sources */,
+-				119AB2062051FFED008E4DDD /* proto-memcached.c in Sources */,
+-				11DD36462107EB8700CBE1DE /* scripting-masscan.c in Sources */,
+-				118B9B3525A00FA900F5FB0B /* massip.c in Sources */,
+-				11BE533625A6441100451F95 /* massip-addr.c in Sources */,
+-				11B039C117E506B400925E7E /* main-listscan.c in Sources */,
+-				11B039C717E7834000925E7E /* proto-dns.c in Sources */,
+-				11B039C817E7834000925E7E /* proto-udp.c in Sources */,
+-				11B039CB17EA092B00925E7E /* proto-snmp.c in Sources */,
+-				115C0CAB18035BC5004E6CD7 /* proto-netbios.c in Sources */,
+-				11DD36432107E7ED00CBE1DE /* vulncheck.c in Sources */,
+-				115C0CAC18035BC5004E6CD7 /* proto-ssl.c in Sources */,
+-				11A868151816F3A7008E00B8 /* in-binary.c in Sources */,
+-				11A868161816F3A7008E00B8 /* stack-src.c in Sources */,
+-				11DD36442107E7ED00CBE1DE /* vulncheck-ntp-monlist.c in Sources */,
+-				11469CA22295D80A00FA76BE /* misc-rstfilter.c in Sources */,
+-				11A868171816F3A7008E00B8 /* masscan-app.c in Sources */,
+-				11A868181816F3A7008E00B8 /* out-redis.c in Sources */,
+-				11A868191816F3A7008E00B8 /* pixie-file.c in Sources */,
+-				11A8681A1816F3A7008E00B8 /* siphash24.c in Sources */,
+-				1124DD6F25B4FF3C00EEFC2C /* stack-if.c in Sources */,
+-				11A8681E1819A6F7008E00B8 /* proto-zeroaccess.c in Sources */,
+-				11B22ED518641DCC00DA5438 /* proto-banout.c in Sources */,
+-				11B22ED618641DCC00DA5438 /* proto-ssl-test.c in Sources */,
+-				118E115725859D5300618314 /* util-checksum.c in Sources */,
+-				11B22ED718641DCC00DA5438 /* proto-x509.c in Sources */,
+-				11A773EB1881BFC700B135DE /* crypto-base64.c in Sources */,
+-				11E76DB41889BC5200061F45 /* pixie-backtrace.c in Sources */,
+-				11AC2F9B188CE34A008CB623 /* proto-sctp.c in Sources */,
+-				11BA296218902CEE0064A759 /* out-grepable.c in Sources */,
+-				11BA296318902CEE0064A759 /* proto-tcp-telnet.c in Sources */,
+-				11BA296B189060220064A759 /* proto-ntp.c in Sources */,
+-				11DD363B2107DFEB00CBE1DE /* scripting.c in Sources */,
+-				11B05EA618B9649F009C935E /* crypto-blackrock2.c in Sources */,
+-				112A871A1F9D8DF200D4D240 /* out-ndjson.c in Sources */,
+-				11B05EA718B9649F009C935E /* main-readrange.c in Sources */,
+-				11A50CAE191C128F006D5802 /* out-json.c in Sources */,
+-				11623F6A191E0DB00075EEE6 /* out-certs.c in Sources */,
+-				11126597197A086B00DC5987 /* out-unicornscan.c in Sources */,
+-				11420DD319A2D47A00DB5BFE /* proto-vnc.c in Sources */,
+-				11C936C31EDCE77F0023D32E /* in-filter.c in Sources */,
+-				11420DD819A8160500DB5BFE /* proto-ftp.c in Sources */,
+-				110C79B022833AFA003FAC94 /* proto-oproto.c in Sources */,
+-				11420DDB19A84A9F00DB5BFE /* proto-smtp.c in Sources */,
+-				11DD363421067BD400CBE1DE /* out-tcp-services.c in Sources */,
+-				11420DDE19A8FDE300DB5BFE /* proto-pop3.c in Sources */,
+-				11420DE019A90CB300DB5BFE /* proto-interactive.c in Sources */,
+-				11420DE319A9363B00DB5BFE /* proto-imap4.c in Sources */,
+-				118B9B3425A00FA900F5FB0B /* massip-parse.c in Sources */,
+-				1124DD6B25B4FF1600EEFC2C /* out-hostonly.c in Sources */,
+-				11DD36382107DE9700CBE1DE /* stub-lua.c in Sources */,
+-			);
+-			runOnlyForDeploymentPostprocessing = 0;
+-		};
+-/* End PBXSourcesBuildPhase section */
+-
+-/* Begin XCBuildConfiguration section */
+-		11A9218D17DBCB3200DDFD32 /* Debug */ = {
+-			isa = XCBuildConfiguration;
+-			buildSettings = {
+-				ALWAYS_SEARCH_USER_PATHS = NO;
+-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+-				COPY_PHASE_STRIP = NO;
+-				GCC_C_LANGUAGE_STANDARD = gnu99;
+-				GCC_DYNAMIC_NO_PIC = NO;
+-				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+-				GCC_OPTIMIZATION_LEVEL = 0;
+-				GCC_PREPROCESSOR_DEFINITIONS = (
+-					"DEBUG=1",
+-					"$(inherited)",
+-				);
+-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+-				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+-				GCC_WARN_UNUSED_VARIABLE = YES;
+-				MACOSX_DEPLOYMENT_TARGET = 10.6;
+-				ONLY_ACTIVE_ARCH = YES;
+-				SDKROOT = macosx;
+-			};
+-			name = Debug;
+-		};
+-		11A9218E17DBCB3200DDFD32 /* Release */ = {
+-			isa = XCBuildConfiguration;
+-			buildSettings = {
+-				ALWAYS_SEARCH_USER_PATHS = NO;
+-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+-				COPY_PHASE_STRIP = YES;
+-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+-				GCC_C_LANGUAGE_STANDARD = gnu99;
+-				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+-				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+-				GCC_WARN_UNUSED_VARIABLE = YES;
+-				MACOSX_DEPLOYMENT_TARGET = 10.6;
+-				SDKROOT = macosx;
+-			};
+-			name = Release;
+-		};
+-		11A9219017DBCB3200DDFD32 /* Debug */ = {
+-			isa = XCBuildConfiguration;
+-			buildSettings = {
+-				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = NO;
+-				CONFIGURATION_BUILD_DIR = ../bin;
+-				CONFIGURATION_TEMP_DIR = ../tmp;
+-				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+-				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+-				GCC_WARN_SHADOW = YES;
+-				GCC_WARN_UNDECLARED_SELECTOR = YES;
+-				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+-				GCC_WARN_UNUSED_FUNCTION = YES;
+-				GCC_WARN_UNUSED_LABEL = YES;
+-				GCC_WARN_UNUSED_PARAMETER = NO;
+-				OBJROOT = ../tmp;
+-				OTHER_LDFLAGS = "-lpcap";
+-				"OTHER_TEST_FLAGS[sdk=*]" = "--selftest";
+-				PRODUCT_NAME = masscan;
+-				RUN_CLANG_STATIC_ANALYZER = YES;
+-				SYMROOT = ../bin;
+-				TEST_AFTER_BUILD = YES;
+-			};
+-			name = Debug;
+-		};
+-		11A9219117DBCB3200DDFD32 /* Release */ = {
+-			isa = XCBuildConfiguration;
+-			buildSettings = {
+-				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = NO;
+-				CONFIGURATION_BUILD_DIR = ../bin;
+-				CONFIGURATION_TEMP_DIR = ../tmp;
+-				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+-				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+-				GCC_WARN_SHADOW = YES;
+-				GCC_WARN_UNDECLARED_SELECTOR = YES;
+-				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+-				GCC_WARN_UNUSED_FUNCTION = YES;
+-				GCC_WARN_UNUSED_LABEL = YES;
+-				GCC_WARN_UNUSED_PARAMETER = NO;
+-				OBJROOT = ../tmp;
+-				OTHER_LDFLAGS = "-lpcap";
+-				OTHER_TEST_FLAGS = "--selftest";
+-				PRODUCT_NAME = masscan;
+-				SYMROOT = ../bin;
+-				TEST_AFTER_BUILD = YES;
+-			};
+-			name = Release;
+-		};
+-/* End XCBuildConfiguration section */
+-
+-/* Begin XCConfigurationList section */
+-		11A9217F17DBCB3200DDFD32 /* Build configuration list for PBXProject "masscan" */ = {
+-			isa = XCConfigurationList;
+-			buildConfigurations = (
+-				11A9218D17DBCB3200DDFD32 /* Debug */,
+-				11A9218E17DBCB3200DDFD32 /* Release */,
+-			);
+-			defaultConfigurationIsVisible = 0;
+-			defaultConfigurationName = Release;
+-		};
+-		11A9218F17DBCB3200DDFD32 /* Build configuration list for PBXNativeTarget "masscan" */ = {
+-			isa = XCConfigurationList;
+-			buildConfigurations = (
+-				11A9219017DBCB3200DDFD32 /* Debug */,
+-				11A9219117DBCB3200DDFD32 /* Release */,
+-			);
+-			defaultConfigurationIsVisible = 0;
+-			defaultConfigurationName = Release;
+-		};
+-/* End XCConfigurationList section */
+-	};
+-	rootObject = 11A9217C17DBCB3200DDFD32 /* Project object */;
+-}
